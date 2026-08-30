@@ -1,0 +1,6 @@
+{
+  "name": "AegisQuant DeFi Treasury & Risk Platform",
+  "description": "Production-grade SaaS platform for institutional DeFi treasury management, automated quantitative execution pipeline, real-time collateral & liquidation risk engine, and smart contract architecture.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
