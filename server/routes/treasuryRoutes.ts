@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+﻿import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import Decimal from 'decimal.js';
 import { db } from '../db/database';
@@ -9,19 +9,16 @@ import { autonomousEngine } from '../services/autonomousSettlementEngine';
 
 const router = Router();
 
-// GET /api/treasury/summary (Live SELECT SUM queries & exact Decimal arithmetic)
 router.get('/summary', (req: Request, res: Response) => {
   const summary = db.getTreasurySummary();
   res.json(summary);
 });
 
-// GET /api/treasury/autonomous-engine (Zero-Touch Autonomous Pipeline Telemetry)
 router.get('/autonomous-engine', (req: Request, res: Response) => {
   const status = autonomousEngine.getStatus();
   res.json(status);
 });
 
-// POST /api/treasury/autonomous-engine/toggle (Toggle Autonomous Daemon)
 router.post('/autonomous-engine/toggle', requireRoles(['ADMIN']), (req: Request, res: Response) => {
   const active = req.body.active !== false;
   const isNowActive = autonomousEngine.toggleDaemon(active);
@@ -32,7 +29,6 @@ router.post('/autonomous-engine/toggle', requireRoles(['ADMIN']), (req: Request,
   });
 });
 
-// POST /api/treasury/autonomous-engine/trigger (Zero-Touch Event-Driven Yield Capture & Settlement)
 const triggerEngineSchema = z.object({
   grossYieldUsd: z.number().positive().default(5000),
   sourceStrategy: z.string().default('STRAT_ETH_STETH_ARBITRAGE'),
@@ -66,7 +62,6 @@ router.post('/autonomous-engine/trigger', (req: Request, res: Response) => {
   }
 });
 
-// POST /api/treasury/withdraw-net-profit (Zero-Friction Net Profit Withdrawal to Owner Account)
 const withdrawNetProfitSchema = z.object({
   amountUsd: z.number().positive('Withdrawal amount must be greater than zero'),
   destinationAddress: z.string().min(10).default('0x72ee60da793a3d145eb60a526226a9980e65c472'),
@@ -103,19 +98,17 @@ router.post('/withdraw-net-profit', financialTxRateLimiter, (req: Request, res: 
   }
 });
 
-// GET /api/treasury/ledger (Live double-entry journal records)
 router.get('/ledger', (req: Request, res: Response) => {
   const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 50));
   const ledger = db.getLedgerEntries(limit);
   res.json({ ledger });
 });
 
-// POST /api/treasury/calculate-allocation (Deterministic Fund Partitioning Preview)
 const allocationSchema = z.object({
   realizedProfitUsd: z.number().positive('Profit amount must be greater than zero'),
   operatingReservePct: z.number().min(0).max(100).default(20),
   riskReservePct: z.number().min(0).max(100).default(15),
-  treasuryPct: z.number().min(0).max(100).default(60), // 50% Net Profit Sweep + 10% Cold Buffer
+  treasuryPct: z.number().min(0).max(100).default(60),
   reinvestmentPct: z.number().min(0).max(100).default(5),
 });
 
@@ -139,7 +132,6 @@ router.post('/calculate-allocation', (req: Request, res: Response) => {
   }
 
   const profitDec = new Decimal(realizedProfitUsd);
-  
   const netProfitSweepAmt = profitDec.times(0.50);
   const legacyRemainderAmt = profitDec.times(0.50);
 
@@ -194,7 +186,6 @@ router.post('/calculate-allocation', (req: Request, res: Response) => {
   });
 });
 
-// POST /api/treasury/route-profits (Executes live multi-bucket profit distribution to database & ledger)
 const routeProfitSchema = z.object({
   realizedProfitUsd: z.number().positive('Profit must be positive'),
   operatingReservePct: z.number().min(0).max(100),
@@ -286,7 +277,6 @@ router.post(
   }
 );
 
-// POST /api/treasury/deposit (Deposit external funds into reserve)
 const depositSchema = z.object({
   bucket: z.enum(['OPERATING', 'INSURANCE_RISK', 'COLD_TREASURY', 'REINVESTMENT']),
   amountUsd: z.number().positive(),
@@ -332,13 +322,11 @@ router.post('/deposit', financialTxRateLimiter, requireRoles(['ADMIN', 'OPERATOR
   });
 });
 
-// GET /api/treasury/reconciliation (Hourly reconciliation reports & on-demand auditor)
 router.get('/reconciliation', (req: Request, res: Response) => {
   const reports = db.getReconciliationReports(10);
   res.json({ reports });
 });
 
-// POST /api/treasury/reconciliation/run (Trigger on-demand reconciliation audit)
 router.post('/reconciliation/run', requireRoles(['ADMIN', 'AUDITOR', 'RISK_MANAGER']), (req: Request, res: Response) => {
   const user = req.user!;
   const report = db.runReconciliationAudit(MANUAL_AUDIT_BY_${user.role}_${user.email});
@@ -356,4 +344,4 @@ router.post('/reconciliation/run', requireRoles(['ADMIN', 'AUDITOR', 'RISK_MANAG
   res.json({ report });
 });
 
-export default router;,
+export default router;
