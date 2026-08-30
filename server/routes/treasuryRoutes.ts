@@ -140,9 +140,7 @@ router.post('/calculate-allocation', (req: Request, res: Response) => {
 
   const profitDec = new Decimal(realizedProfitUsd);
   
-  // Deterministic 50% Net Profit direct sweep
   const netProfitSweepAmt = profitDec.times(0.50);
-  // Remaining 50% legacy distribution
   const legacyRemainderAmt = profitDec.times(0.50);
 
   const operatingAmt = profitDec.times(operatingReservePct).dividedBy(100);
@@ -358,4 +356,4 @@ router.post('/reconciliation/run', requireRoles(['ADMIN', 'AUDITOR', 'RISK_MANAG
   res.json({ report });
 });
 
-export default router;
+export default router;,
