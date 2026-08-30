@@ -317,7 +317,7 @@ router.post('/deposit', financialTxRateLimiter, requireRoles(['ADMIN', 'OPERATOR
 
   res.json({
       status: 'WITHDRAWAL_EXECUTED',
-      message: Zero-friction withdrawal of $${amountUsd.toLocaleString(undefined, { minimumFractionDigits: 2 })} successfully routed to permanent OKX primary account ${destinationAddress}.,
+      message: 'Zero-friction withdrawal successfully routed to permanent OKX primary account ' + destinationAddress + '.',
       result,
       updated_treasury: db.getTreasurySummary()
     });
