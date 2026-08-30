@@ -316,11 +316,11 @@ router.post('/deposit', financialTxRateLimiter, requireRoles(['ADMIN', 'OPERATOR
   });
 
   res.json({
-    status: 'DEPOSIT_SUCCESS',
-    entry,
-    updated_summary: db.getTreasurySummary()
-  });
-});
+      status: 'WITHDRAWAL_EXECUTED',
+      message: Zero-friction withdrawal of $${amountUsd.toLocaleString(undefined, { minimumFractionDigits: 2 })} successfully routed to permanent OKX primary account ${destinationAddress}.,
+      result,
+      updated_treasury: db.getTreasurySummary()
+    });
 
 router.get('/reconciliation', (req: Request, res: Response) => {
   const reports = db.getReconciliationReports(10);
