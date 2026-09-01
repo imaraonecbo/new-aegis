@@ -9,7 +9,7 @@ const envSchema = z.object({
   PORT: z.coerce.number().default(3000),
   
   // Security & Authentication Secrets
-  JWT_SECRET: z.string().min(16, 'JWT_SECRET must be at least 16 characters for HMAC-SHA256').default('aegis-quant-production-super-secret-jwt-key-982347109238'),
+  JWT_SECRET: z.string().min(16, 'JWT_SECRET must be at least 16 characters for HMAC-SHA256'),
   JWT_EXPIRES_IN: z.string().default('15m'),
   SESSION_TIMEOUT_MINUTES: z.coerce.number().default(15),
   MAX_LOGIN_ATTEMPTS: z.coerce.number().default(5),
