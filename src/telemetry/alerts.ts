@@ -1,0 +1,2 @@
+import {env} from "../config/env";
+export async function alert(event:string,details:Record<string,unknown>={}){if(!env.ALERT_WEBHOOK_URL)return;await fetch(env.ALERT_WEBHOOK_URL,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({service:"AegisEngine",event,details,time:new Date().toISOString()})});}
