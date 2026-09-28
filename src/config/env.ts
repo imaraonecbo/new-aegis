@@ -1,0 +1,11 @@
+import {z} from "zod";
+const b=z.enum(["true","false"]).transform(v=>v==="true");
+const schema=z.object({
+ NODE_ENV:z.enum(["development","test","production"]).default("production"),ENGINE_ENABLED:b.default("false"),ENGINE_DRY_RUN:b.default("true"),
+ CHAIN_ID:z.coerce.number().int().default(42161),ARBITRUM_RPC_URL:z.string().url(),ARBITRUM_SIMULATION_RPC_URL:z.string().url(),ARBITRUM_PRIVATE_RPC_URL:z.string().url(),
+ EXECUTOR_ADDRESS:z.string().regex(/^0x[a-fA-F0-9]{40}$/),EXECUTOR_PRIVATE_KEY:z.string().regex(/^0x[a-fA-F0-9]{64}$/),EXECUTION_SIGNER_PRIVATE_KEY:z.string().regex(/^0x[a-fA-F0-9]{64}$/),
+ TARGET_BLOCK_OFFSET:z.coerce.number().int().min(1).max(1).default(1),PRIVATE_SUBMISSION_REQUIRED:b.default("true"),PRIVATE_RPC_METHOD:z.string().default("eth_sendRawTransaction"),
+ MIN_PROFIT_USD:z.coerce.number().positive().default(5),MIN_PROFIT_BPS:z.coerce.number().nonnegative().default(20),RELAYER_FEE_CAP_BPS:z.coerce.number().nonnegative().default(5),
+ SIMULATION_TIMEOUT_MS:z.coerce.number().int().positive().default(5000),MAX_TRADE_USD:z.coerce.number().positive().default(1000),SENTRY_DSN:z.string().url().optional(),ALERT_WEBHOOK_URL:z.string().url().optional()
+}).superRefine((v,c)=>{if(v.CHAIN_ID!==42161)c.addIssue({code:"custom",path:["CHAIN_ID"],message:"Arbitrum One only"});if(v.ENGINE_ENABLED&&v.ENGINE_DRY_RUN)c.addIssue({code:"custom",path:["ENGINE_DRY_RUN"],message:"Live engine cannot be dry-run"});if(v.ENGINE_ENABLED&&!v.PRIVATE_SUBMISSION_REQUIRED)c.addIssue({code:"custom",path:["PRIVATE_SUBMISSION_REQUIRED"],message:"Private submission is mandatory"});});
+export type Env=z.infer<typeof schema>;export const env=schema.parse(process.env);
