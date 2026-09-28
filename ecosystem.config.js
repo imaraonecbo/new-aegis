@@ -1,0 +1,1 @@
+module.exports={apps:[{name:"aegis-engine",script:"dist/server.cjs",instances:1,exec_mode:"fork",autorestart:true,watch:false,max_memory_restart:"512M",env:{NODE_ENV:"production",ENGINE_ENABLED:"false",ENGINE_DRY_RUN:"true"}}]};
