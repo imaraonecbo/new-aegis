@@ -1,5 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import cookieParser from 'cookie-parser';
 import { createServer as createViteServer } from 'vite';
 
@@ -23,8 +24,8 @@ import tradingRoutes from './server/routes/tradingRoutes';
 import auditRoutes from './server/routes/auditRoutes';
 import { healthz } from './src/server/healthz';
 
-// const __filename = __filename;
-// const __dirname = __dirname;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();
