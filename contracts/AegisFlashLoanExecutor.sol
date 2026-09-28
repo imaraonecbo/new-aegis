@@ -279,7 +279,7 @@ contract AegisFlashLoanExecutor is EIP712,Ownable,ReentrancyGuard,Pausable,IUnis
         _validateCallback(e,c,ap,sig);
         uint256 borrowed=amount0>0?amount0:amount1;
         if(borrowed!=activePrincipal) revert InvalidAmount();
-        uint256 fee=(borrowed*3+996)/997;
+        uint256 fee=(borrowed*3+996)/997+1;
         uint256 repayment=borrowed+fee;
         _run(ap,c);
         uint256 bal=IERC20(e.asset).balanceOf(address(this));
