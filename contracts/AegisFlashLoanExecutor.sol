@@ -227,7 +227,7 @@ contract AegisFlashLoanExecutor is EIP712,Ownable,ReentrancyGuard,Pausable,IUnis
         if(e.relayer!=activeRelayer) revert InvalidRecipient();
         if(e.deadline<block.timestamp) revert DeadlineExpired();
         if(e.targetBlock!=block.number) revert TargetBlockMismatch();
-        if(keccak256(abi.encode(c,a))!=e.routeHash||e.routeHash!=activeLoanHash&&activeSource==SOURCE_BALANCER) revert InvalidRoute();
+        if(keccak256(abi.encode(c,a))!=e.routeHash) revert InvalidRoute();
         bytes32 digest=_executionHash(e);
         if(!authorizedSigners[ECDSA.recover(_hashTypedDataV4(digest),sig)]) revert InvalidSignature();
     }
@@ -332,10 +332,7 @@ contract AegisFlashLoanExecutor is EIP712,Ownable,ReentrancyGuard,Pausable,IUnis
         for(uint256 i=0;i<ap.length;i++){ if(ap[i].token==address(0)||ap[i].spender==address(0)||!targetWhitelist[ap[i].spender]) revert TargetNotAllowed(); IERC20(ap[i].token).forceApprove(ap[i].spender,ap[i].amount); }
         for(uint256 i=0;i<c.length;i++){
             if(c[i].target==address(0)||!targetWhitelist[c[i].target]||c[i].value!=0||c[i].data.length<4) revert TargetNotAllowed();
-            bytes4 selector; assembly { selector := mload(add(mload(add(c,0x20)),0x20)) }
-            bytes calldata cd; 
-            cd=c[i].data;
-            bytes4 s; assembly { s := calldataload(cd.offset) }
+            bytes4 s; assembly { s := mload(add(c[i].data, 32)) }
             if(!selectorWhitelist[c[i].target][s]) revert SelectorNotAllowed();
             (bool ok,bytes memory r)=c[i].target.call(c[i].data); if(!ok) assembly { revert(add(r,32),mload(r)) }
         }
