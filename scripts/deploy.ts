@@ -1,0 +1,2 @@
+import {network} from "hardhat";
+const {ethers}=await network.connect();const [deployer]=await ethers.getSigners();const aave=process.env.AAVE_V3_POOL;const balancer=process.env.BALANCER_VAULT;if(!aave||!balancer)throw new Error("AAVE_V3_POOL and BALANCER_VAULT are required");const f=await ethers.getContractFactory("AegisFlashLoanExecutor");const c=await f.deploy(aave,balancer,deployer.address);await c.waitForDeployment();console.log("AegisFlashLoanExecutor:",await c.getAddress());
