@@ -21,6 +21,7 @@ import treasuryRoutes from './server/routes/treasuryRoutes';
 import riskRoutes from './server/routes/riskRoutes';
 import tradingRoutes from './server/routes/tradingRoutes';
 import auditRoutes from './server/routes/auditRoutes';
+import { healthz } from './src/server/healthz';
 
 // const __filename = __filename;
 // const __dirname = __dirname;
@@ -83,6 +84,8 @@ async function startServer() {
       }
     });
   });
+
+  app.use(healthz);
 
   // Mount Feature API Routers
   app.use('/api/auth', authRoutes);
