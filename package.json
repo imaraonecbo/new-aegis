@@ -12,7 +12,7 @@
     "start": "node dist/server.cjs",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit",
+    "lint": "npm run lint:contracts",
     "lint:contracts": "tsc --noEmit -p tsconfig.json",
     "contract:compile": "npm run build:contracts",
     "contract:test": "hardhat test",
@@ -20,11 +20,12 @@
     "test:fork": "hardhat test test/AegisFlashLoanExecutor.realFork.spec.ts --network hardhat",
     "smoke-test": "tsx scripts/productionSmokeTest.ts",
     "deploy:arbitrum": "hardhat run scripts/deploy.ts --network arbitrum",
-    "verify:arbitrum": "hardhat run --build-profile production scripts/verify.ts --network arbitrum"
+    "verify:arbitrum": "hardhat run --build-profile production scripts/verify.ts --network arbitrum",
+    "deploy:production": "npm run build:contracts && npm run deploy:arbitrum && npm run verify:arbitrum && npm run smoke-test"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
-    "@tailwindcss/vite": "^4.1.14",
+    "@tailwindcss/vite": "^5.0.4",
     "@types/bcryptjs": "^3.0.0",
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
