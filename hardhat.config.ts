@@ -1,0 +1,2 @@
+import {defineConfig,configVariable} from "hardhat/config";import hardhatEthers from "@nomicfoundation/hardhat-ethers";
+export default defineConfig({plugins:[hardhatEthers],solidity:{profiles:{default:{version:"0.8.24",settings:{optimizer:{enabled:true,runs:200}}},production:{version:"0.8.24",settings:{optimizer:{enabled:true,runs:200},viaIR:false}}}},networks:{arbitrum:{type:"http",chainId:42161,url:configVariable("ARBITRUM_RPC_URL"),accounts:[configVariable("EXECUTOR_PRIVATE_KEY")]}}});
