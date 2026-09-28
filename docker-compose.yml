@@ -1,0 +1,10 @@
+services:
+  aegis-engine:
+    build: .
+    restart: unless-stopped
+    env_file: .env.production
+    ports: ["3000:3000"]
+    read_only: true
+    tmpfs: ["/tmp"]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
