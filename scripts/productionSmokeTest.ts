@@ -1,28 +1,24 @@
 import "dotenv/config";
-import { JsonRpcProvider, Contract, Wallet, keccak256, toUtf8Bytes } from "ethers";
-const ABI=[
- "function DOMAIN_SEPARATOR() view returns(bytes32)",
- "function targetWhitelist(address) view returns(bool)",
- "function authorizedRelayers(address) view returns(bool)",
- "function paused() view returns(bool)"
-];
+import { JsonRpcProvider, Contract, TypedDataEncoder } from "ethers";
+const ABI=["function DOMAIN_SEPARATOR() view returns(bytes32)","function targetWhitelist(address) view returns(bool)","function authorizedRelayers(address) view returns(bool)","function paused() view returns(bool)"];
 const required=(k:string)=>{const v=process.env[k];if(!v)throw new Error("Missing "+k);return v};
 const main=async()=>{
- const rpc=required("ARBITRUM_MAINNET_RPC");const privateRpc=required("ARBITRUM_PRIVATE_RPC_URL");
- const address=required("EXECUTOR_ADDRESS");const relayer=required("EXECUTOR_ADDRESS");
- const started=Date.now();const p=new JsonRpcProvider(rpc,42161,{staticNetwork:true});await p.getBlockNumber();const latency=Date.now()-started;
- if(latency>=50)throw new Error("RPC latency gate failed: "+latency+"ms");
- if(rpc===privateRpc)throw new Error("Private MEV endpoint must be distinct from main read endpoint");
- const c=new Contract(address,ABI,p);
- const onchain=await c.DOMAIN_SEPARATOR();
- const name=process.env.EIP712_NAME||"AegisEngine";const version=process.env.EIP712_VERSION||"1";
- const domainHash=keccak256(toUtf8Bytes(name+":"+version+":42161:"+address.toLowerCase()));
- console.log(JSON.stringify({chainId:(await p.getNetwork()).chainId.toString(),rpcLatencyMs:latency,domainSeparator:onchain,derivedDomainHash:domainHash,domainHashMethod:"informational-only; use ethers TypedDataEncoder.hashDomain for authoritative parity"} ,null,2));
+ const rpc=required("ARBITRUM_MAINNET_RPC");const privateRpc=required("ARBITRUM_PRIVATE_RPC_URL");const address=required("EXECUTOR_ADDRESS");const relayer=required("RELAYER_ADDRESS");
+ const p=new JsonRpcProvider(rpc,42161,{staticNetwork:true});const t=Date.now();await p.getBlockNumber();const latency=Date.now()-t;
+ if(latency>=50)throw new Error("Read RPC latency gate failed: "+latency+"ms");
+ if(rpc===privateRpc)throw new Error("Private MEV RPC must not equal public/read RPC");
+ const c=new Contract(address,ABI,p);const onchain=await c.DOMAIN_SEPARATOR();
+ const offchain=TypedDataEncoder.hashDomain({name:"AegisEngine",version:"1",chainId:42161,verifyingContract:address});
+ if(onchain.toLowerCase()!==offchain.toLowerCase())throw new Error("EIP-712 DOMAIN_SEPARATOR mismatch");
  if(await c.paused())throw new Error("Executor is paused");
  const balance=await p.getBalance(relayer);if(balance<=50000000000000000n)throw new Error("Relayer balance must exceed 0.05 ETH");
  const privateProvider=new JsonRpcProvider(privateRpc,42161,{staticNetwork:true});await privateProvider.getBlockNumber();
- if(process.env.PRIVATE_SUBMISSION_ATTESTED!=="true")throw new Error("PRIVATE_SUBMISSION_ATTESTED=true is required");
- if(process.env.SIMULATION_ENDPOINT_ATTESTED!=="true")throw new Error("SIMULATION_ENDPOINT_ATTESTED=true is required");
- console.log("PREFLIGHT PASS: endpoint attestations, chain, latency, contract state and gas balance passed.");
+ if(process.env.PRIVATE_SUBMISSION_ATTESTED!=="true")throw new Error("PRIVATE_SUBMISSION_ATTESTED=true required");
+ if(process.env.SIMULATION_ENDPOINT_ATTESTED!=="true")throw new Error("SIMULATION_ENDPOINT_ATTESTED=true required");
+ const routers=Object.entries({UNISWAP_V3_ROUTER:process.env.UNISWAP_V3_ROUTER,CAMELOT_ROUTER:process.env.CAMELOT_ROUTER,CURVE_ROUTER:process.env.CURVE_ROUTER,BALANCER_VAULT:process.env.BALANCER_VAULT});
+ const whitelist=Object.fromEntries(await Promise.all(routers.filter(([,a])=>a).map(async([n,a])=>[n,await c.targetWhitelist(a!)])));
+ if(Object.values(whitelist).some(v=>!v))throw new Error("One or more configured DEX targets are not whitelisted: "+JSON.stringify(whitelist));
+ console.log(JSON.stringify({chainId:(await p.getNetwork()).chainId.toString(),rpcLatencyMs:latency,domainSeparator:onchain,relayerBalanceEth:Number(balance)/1e18,whitelist},null,2));
+ console.log("PREFLIGHT PASS");
 };
 main().catch(e=>{console.error("PREFLIGHT FAIL:",e instanceof Error?e.message:e);process.exit(1)});
