@@ -3,30 +3,26 @@
     "target": "ES2022",
     "module": "CommonJS",
     "moduleResolution": "node",
-    "jsx": "react-jsx",
     "strict": false,
     "noImplicitAny": false,
     "skipLibCheck": true,
     "skipDefaultLibCheck": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "isolatedModules": true,
     "noEmit": true
   },
   "include": [
     "hardhat.config.ts",
-    "scripts/**/*",
-    "test/**/*",
-    "contracts/**/*"
+    "scripts/**/*"
   ],
   "exclude": [
     "node_modules",
+    "test/**/*",
+    "src/**/*",
+    "server.ts",
     "dist",
     "artifacts",
-    "cache",
-    "src/**/*",
-    "server.ts"
+    "cache"
   ]
 }
