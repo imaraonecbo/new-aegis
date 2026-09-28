@@ -328,9 +328,9 @@ contract AegisFlashLoanExecutor is EIP712,Ownable,ReentrancyGuard,Pausable,IUnis
         for(uint256 i=0;i<ap.length;i++){ if(ap[i].token==address(0)||ap[i].spender==address(0)||!targetWhitelist[ap[i].spender]) revert TargetNotAllowed(); IERC20(ap[i].token).forceApprove(ap[i].spender,ap[i].amount); }
         for(uint256 i=0;i<c.length;i++){
             if(c[i].target==address(0)||!targetWhitelist[c[i].target]||c[i].value!=0||c[i].data.length<4) revert TargetNotAllowed();
-            bytes4 s; assembly ("memory-safe") { s := mload(add(c[i].data, 0x20)) }
-            if(!selectorWhitelist[c[i].target][s]) revert SelectorNotAllowed();
-            (bool ok,bytes memory r)=c[i].target.call(c[i].data); if(!ok) assembly { revert(add(r,32),mload(r)) }
+            bytes memory callData = c[i].data;
+            bytes4 s;
+            assembly ("memory-safe") { s := mload(add(callData, 0x20)) }
         }
         for(uint256 i=0;i<ap.length;i++) IERC20(ap[i].token).forceApprove(ap[i].spender,0);
     }
