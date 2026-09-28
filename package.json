@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx server.ts",
     "scan": "tsx server/scanner/index.ts",
-    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "build": "hardhat clean && hardhat compile --force",
     "start": "node dist/server.cjs",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
@@ -14,8 +14,10 @@
     "contract:compile": "hardhat build",
     "contract:test": "hardhat test",
     "test": "npm run contract:compile && npm run contract:test",
-    "test:fork": "hardhat test --network arbitrumFork test/AegisFlashLoanExecutor.full.spec.ts",
-    "smoke-test": "tsx scripts/productionSmokeTest.ts"
+    "test:fork": "hardhat test test/AegisFlashLoanExecutor.realFork.spec.ts --network hardhat",
+    "smoke-test": "tsx scripts/productionSmokeTest.ts",
+    "deploy:arbitrum": "hardhat run scripts/deploy.ts --network arbitrum",
+    "verify:arbitrum": "hardhat run --build-profile production scripts/verify.ts --network arbitrum"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -60,6 +62,7 @@
     "vite": "^6.2.3",
     "hardhat": "^3.18.0",
     "chai": "^5.3.3",
-    "@nomicfoundation/hardhat-toolbox-mocha-ethers": "^4.0.0"
+    "@nomicfoundation/hardhat-toolbox-mocha-ethers": "^4.0.0",
+    "@nomicfoundation/hardhat-verify": "^3.1.1"
   }
 }
