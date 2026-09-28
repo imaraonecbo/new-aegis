@@ -234,7 +234,7 @@ contract AegisFlashLoanExecutor is EIP712,Ownable,ReentrancyGuard,Pausable,IUnis
 
     function executeOperation(address a,uint256 amount,uint256 premium,address initiator,bytes calldata p)
         external onlyActive returns(bool)
-    {
+    { if(msg.sig!=0x1b11d0ff) revert InvalidCaller();
         if(activeSource!=SOURCE_AAVE||msg.sender!=address(AAVE_POOL)||initiator!=address(this)||a!=activeAsset||amount!=activePrincipal) revert InvalidCaller();
         (Execution memory e,Call[] memory c,Approval[] memory ap,bytes memory sig)=abi.decode(p,(Execution,Call[],Approval[],bytes));
         _validateCallback(e,c,ap,sig);
@@ -246,6 +246,7 @@ contract AegisFlashLoanExecutor is EIP712,Ownable,ReentrancyGuard,Pausable,IUnis
     function receiveFlashLoan(address[] calldata tokens,uint256[] calldata amounts,uint256[] calldata feeAmounts,bytes calldata p)
         external onlyActive
     {
+        if(msg.sig!=0xf04f2707) revert InvalidCaller();
         if(activeSource!=SOURCE_BALANCER||msg.sender!=address(BALANCER_VAULT)||tokens.length==0||tokens.length!=amounts.length||tokens.length!=feeAmounts.length) revert InvalidCaller();
         (Execution memory e,address[] memory dataTokens,uint256[] memory dataAmounts,uint256[] memory baselines,Call[] memory c,Approval[] memory ap,bytes memory sig)=abi.decode(p,(Execution,address[],uint256[],uint256[],Call[],Approval[],bytes));
         if(dataTokens.length!=tokens.length||dataAmounts.length!=tokens.length||baselines.length!=tokens.length) revert InvalidArrayLength();
@@ -271,13 +272,14 @@ contract AegisFlashLoanExecutor is EIP712,Ownable,ReentrancyGuard,Pausable,IUnis
     }
 
     function uniswapV2Call(address sender,uint256 amount0,uint256 amount1,bytes calldata data) external override onlyActive {
+        if(msg.sig!=0x10d1e85c) revert InvalidCaller();
         if(activeSource!=SOURCE_V2||msg.sender!=activeSourceAddress||!v2PairWhitelist[msg.sender]||sender!=address(this)) revert InvalidCaller();
         if(amount0>0&&amount1>0) revert InvalidAmount();
         (Execution memory e,Call[] memory c,Approval[] memory ap,bytes memory sig)=abi.decode(data,(Execution,Call[],Approval[],bytes));
         _validateCallback(e,c,ap,sig);
         uint256 borrowed=amount0>0?amount0:amount1;
         if(borrowed!=activePrincipal) revert InvalidAmount();
-        uint256 fee=(borrowed*3)/997+1;
+        uint256 fee=(borrowed*3+996)/997;
         uint256 repayment=borrowed+fee;
         _run(ap,c);
         uint256 bal=IERC20(e.asset).balanceOf(address(this));
@@ -292,6 +294,7 @@ contract AegisFlashLoanExecutor is EIP712,Ownable,ReentrancyGuard,Pausable,IUnis
     }
 
     function uniswapV3FlashCallback(uint256 fee0,uint256 fee1,bytes calldata data) external override onlyActive {
+        if(msg.sig!=0xe9cbafb0) revert InvalidCaller();
         if(activeSource!=SOURCE_V3||msg.sender!=activeSourceAddress) revert InvalidCaller();
         _assertCanonicalV3Pool(msg.sender);
         if(fee0>0&&fee1>0) revert InvalidAmount();
