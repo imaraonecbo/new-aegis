@@ -1,0 +1,2 @@
+export type DepthQuote={size:number;buyOut:number;sellOut:number;impactBps:number};
+export function evaluateDepth(q:DepthQuote[],gasUsd:number,flashFeeUsd:number,minProfitUsd:number){if(q.length!==4)throw new Error("Five-gate liquidity probe requires 0.25x/0.5x/0.8x/1.0x");const edge=q[3].sellOut-q[3].buyOut-gasUsd-flashFeeUsd;const worstImpact=Math.max(...q.map(x=>x.impactBps));return{edge, worstImpactBps:worstImpact, profitable:edge>=minProfitUsd&&worstImpact<=100}}
