@@ -1,0 +1,1 @@
+import {Router} from "express";import {env} from "../config/env";export const healthz=Router();healthz.get("/healthz",(_,res)=>res.status(env.CHAIN_ID===42161?200:503).json({ok:env.CHAIN_ID===42161,chainId:env.CHAIN_ID,engineEnabled:env.ENGINE_ENABLED,dryRun:env.ENGINE_DRY_RUN,privateSubmissionRequired:env.PRIVATE_SUBMISSION_REQUIRED}));
