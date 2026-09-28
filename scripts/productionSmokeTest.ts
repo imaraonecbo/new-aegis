@@ -3,7 +3,7 @@ import { JsonRpcProvider, Contract, TypedDataEncoder } from "ethers";
 const ABI=["function DOMAIN_SEPARATOR() view returns(bytes32)","function targetWhitelist(address) view returns(bool)","function authorizedRelayers(address) view returns(bool)","function paused() view returns(bool)"];
 const required=(k:string)=>{const v=process.env[k];if(!v)throw new Error("Missing "+k);return v};
 const main=async()=>{
- const rpc=required("ARBITRUM_MAINNET_RPC");const privateRpc=required("ARBITRUM_PRIVATE_RPC_URL");const address=required("EXECUTOR_ADDRESS");const relayer=required("RELAYER_ADDRESS");
+ const rpc=process.env.ARBITRUM_MAINNET_RPC||process.env.ARBITRUM_RPC_URL||required("ARBITRUM_MAINNET_RPC");const privateRpc=required("ARBITRUM_PRIVATE_RPC_URL");const address=required("EXECUTOR_ADDRESS");const relayer=required("RELAYER_ADDRESS");
  const p=new JsonRpcProvider(rpc,42161,{staticNetwork:true});const t=Date.now();await p.getBlockNumber();const latency=Date.now()-t;
  if(latency>=50)throw new Error("Read RPC latency gate failed: "+latency+"ms");
  if(rpc===privateRpc)throw new Error("Private MEV RPC must not equal public/read RPC");
