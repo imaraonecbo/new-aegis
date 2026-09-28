@@ -1,10 +1,11 @@
 import { defineConfig } from "hardhat/config";
-import hardhatEthers from "@nomicfoundation/hardhat-ethers";
+import hardhatToolboxMochaEthers from "@nomicfoundation/hardhat-toolbox-mocha-ethers";
 
 const forkRpc = process.env.ARBITRUM_MAINNET_RPC || "https://arb1.arbitrum.io/rpc";
 
 export default defineConfig({
-  plugins: [hardhatEthers],
+  plugins: [hardhatToolboxMochaEthers],
+  test: { mocha: { timeout: 120_000 } },
   solidity: {
     profiles: {
       default: {
