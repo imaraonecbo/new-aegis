@@ -12,7 +12,7 @@ export default defineConfig({
         settings: {
           evmVersion: "cancun",
           viaIR: true,
-          optimizer: { enabled: true, runs: 1_000_000 },
+          optimizer: { enabled: true, runs: 200 },
         },
       },
       production: {
@@ -20,7 +20,7 @@ export default defineConfig({
         settings: {
           evmVersion: "cancun",
           viaIR: true,
-          optimizer: { enabled: true, runs: 1_000_000 },
+          optimizer: { enabled: true, runs: 200 },
         },
       },
     },
