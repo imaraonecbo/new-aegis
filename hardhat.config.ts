@@ -1,43 +1,37 @@
+import "dotenv/config";
 import { defineConfig } from "hardhat/config";
 import hardhatToolboxMochaEthers from "@nomicfoundation/hardhat-toolbox-mocha-ethers";
+import hardhatVerify from "@nomicfoundation/hardhat-verify";
 
-const forkRpc = process.env.ARBITRUM_MAINNET_RPC || "https://arb1.arbitrum.io/rpc";
+const rpc = process.env.ARBITRUM_MAINNET_RPC;
+const privateKey = process.env.PRIVATE_KEY;
+const optimizer = { enabled: true, runs: 200 };
+const solidity = { version: "0.8.26", settings: { evmVersion: "cancun" as const, viaIR: true, optimizer } };
+const fork = rpc ? { url: rpc } : undefined;
 
 export default defineConfig({
-  plugins: [hardhatToolboxMochaEthers],
-  test: { mocha: { timeout: 120_000 } },
+  plugins: [hardhatToolboxMochaEthers, hardhatVerify],
+  test: { mocha: { timeout: 180_000 } },
   solidity: {
     profiles: {
-      default: {
-        version: "0.8.26",
-        settings: {
-          evmVersion: "cancun",
-          viaIR: true,
-          optimizer: { enabled: true, runs: 200 },
-        },
-      },
-      production: {
-        version: "0.8.26",
-        settings: {
-          evmVersion: "cancun",
-          viaIR: true,
-          optimizer: { enabled: true, runs: 200 },
-        },
-      },
+      default: solidity,
+      production: solidity,
     },
   },
   networks: {
+    hardhat: { type: "edr-simulated", chainId: 42161, ...(fork ? { forking: fork } : {}) },
     local: { type: "edr-simulated", chainId: 42161 },
-    arbitrumFork: {
-      type: "edr-simulated",
-      chainId: 42161,
-      forking: { url: forkRpc },
-    },
+    arbitrumFork: { type: "edr-simulated", chainId: 42161, ...(fork ? { forking: fork } : {}) },
     arbitrum: {
       type: "http",
       chainId: 42161,
-      url: forkRpc,
-      accounts: process.env.EXECUTOR_PRIVATE_KEY ? [process.env.EXECUTOR_PRIVATE_KEY] : [],
+      url: rpc || "",
+      accounts: privateKey ? [privateKey] : [],
+    },
+  },
+  verify: {
+    etherscan: {
+      apiKey: process.env.ARBISCAN_API_KEY || "",
     },
   },
 });
