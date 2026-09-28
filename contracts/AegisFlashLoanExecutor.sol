@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity 0.8.26;
 
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
@@ -23,6 +23,11 @@ contract AegisFlashLoanExecutor is EIP712,Ownable,ReentrancyGuard,Pausable,IUnis
 
     address public constant UNISWAP_V3_FACTORY = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
 
+    bytes4 private constant AAVE_CALLBACK_SELECTOR = 0x1b11d0ff;
+    bytes4 private constant BALANCER_CALLBACK_SELECTOR = 0xf04f2707;
+    bytes4 private constant UNISWAP_V2_CALLBACK_SELECTOR = 0x10d1e85c;
+    bytes4 private constant UNISWAP_V3_CALLBACK_SELECTOR = 0xe9cbafb0;
+
     bytes32 public constant EXECUTION_TYPEHASH =
         keccak256("Execution(address asset,uint256 amount,uint256 minProfit,uint256 relayerFeeCap,address relayer,address feeRecipient,uint256 nonce,uint256 deadline,uint256 targetBlock,bytes32 routeHash)");
 
@@ -40,16 +45,6 @@ contract AegisFlashLoanExecutor is EIP712,Ownable,ReentrancyGuard,Pausable,IUnis
     }
     struct Call { address target; uint256 value; bytes data; }
     struct Approval { address token; address spender; uint256 amount; }
-
-    struct BalancerFlashData {
-        Execution execution;
-        address[] tokens;
-        uint256[] amounts;
-        uint256[] baselines;
-        Call[] calls;
-        Approval[] approvals;
-        bytes signature;
-    }
 
     IAaveV3Pool public immutable AAVE_POOL;
     IBalancerVault public immutable BALANCER_VAULT;
@@ -90,7 +85,7 @@ contract AegisFlashLoanExecutor is EIP712,Ownable,ReentrancyGuard,Pausable,IUnis
     error ValueNotAllowed();
     error InvalidPool();
     error InvalidArrayLength();
-    error ProfitInvariantFailed(uint256 requiredBalance,uint256 actualBalance);
+    error InsufficientProfit(uint256 finalBalance,uint256 requiredBalance);
     error RescueOnlyPaused();
     error ZeroAddress();
 
@@ -234,7 +229,7 @@ contract AegisFlashLoanExecutor is EIP712,Ownable,ReentrancyGuard,Pausable,IUnis
 
     function executeOperation(address a,uint256 amount,uint256 premium,address initiator,bytes calldata p)
         external onlyActive returns(bool)
-    { if(msg.sig!=0x1b11d0ff) revert InvalidCaller();
+    { if(msg.sig!=AAVE_CALLBACK_SELECTOR) revert InvalidCaller();
         if(activeSource!=SOURCE_AAVE||msg.sender!=address(AAVE_POOL)||initiator!=address(this)||a!=activeAsset||amount!=activePrincipal) revert InvalidCaller();
         (Execution memory e,Call[] memory c,Approval[] memory ap,bytes memory sig)=abi.decode(p,(Execution,Call[],Approval[],bytes));
         _validateCallback(e,c,ap,sig);
@@ -246,7 +241,7 @@ contract AegisFlashLoanExecutor is EIP712,Ownable,ReentrancyGuard,Pausable,IUnis
     function receiveFlashLoan(address[] calldata tokens,uint256[] calldata amounts,uint256[] calldata feeAmounts,bytes calldata p)
         external onlyActive
     {
-        if(msg.sig!=0xf04f2707) revert InvalidCaller();
+        if(msg.sig!=BALANCER_CALLBACK_SELECTOR) revert InvalidCaller();
         if(activeSource!=SOURCE_BALANCER||msg.sender!=address(BALANCER_VAULT)||tokens.length==0||tokens.length!=amounts.length||tokens.length!=feeAmounts.length) revert InvalidCaller();
         (Execution memory e,address[] memory dataTokens,uint256[] memory dataAmounts,uint256[] memory baselines,Call[] memory c,Approval[] memory ap,bytes memory sig)=abi.decode(p,(Execution,address[],uint256[],uint256[],Call[],Approval[],bytes));
         if(dataTokens.length!=tokens.length||dataAmounts.length!=tokens.length||baselines.length!=tokens.length) revert InvalidArrayLength();
@@ -254,25 +249,23 @@ contract AegisFlashLoanExecutor is EIP712,Ownable,ReentrancyGuard,Pausable,IUnis
         _validateCallback(e,c,ap,sig);
         for(uint256 i;i<tokens.length;i++){ if(tokens[i]!=dataTokens[i]||amounts[i]!=dataAmounts[i]) revert InvalidRoute(); }
         _run(ap,c);
-        uint256 primaryBalance=0;
         for(uint256 i;i<tokens.length;i++){
             uint256 extra=(tokens[i]==e.asset)?(e.relayerFeeCap+e.minProfit):0;
             uint256 required=baselines[i]+amounts[i]+feeAmounts[i]+extra;
             uint256 bal=IERC20(tokens[i]).balanceOf(address(this));
-            if(bal<required) revert ProfitInvariantFailed(required,bal);
-            if(tokens[i]==e.asset) primaryBalance=bal;
+            if(bal<required) revert InsufficientProfit(bal,required);
         }
         if(e.relayerFeeCap>0) IERC20(e.asset).safeTransfer(e.feeRecipient,e.relayerFeeCap);
         for(uint256 i;i<tokens.length;i++) IERC20(tokens[i]).safeTransfer(address(BALANCER_VAULT),amounts[i]+feeAmounts[i]);
         uint256 post=IERC20(e.asset).balanceOf(address(this));
         uint256 requiredPost=0;
         for(uint256 i=0;i<tokens.length;i++) if(tokens[i]==e.asset){requiredPost=baselines[i]+e.minProfit;break;}
-        if(post<requiredPost) revert ProfitInvariantFailed(requiredPost,post);
+        if(post<requiredPost) revert InsufficientProfit(post,requiredPost);
         emit ExecutionCompleted(e.nonce,e.asset,e.amount,feeAmounts[0],e.relayerFeeCap,post-activeBaseline-e.amount-feeAmounts[0],e.routeHash);
     }
 
     function uniswapV2Call(address sender,uint256 amount0,uint256 amount1,bytes calldata data) external override onlyActive {
-        if(msg.sig!=0x10d1e85c) revert InvalidCaller();
+        if(msg.sig!=UNISWAP_V2_CALLBACK_SELECTOR) revert InvalidCaller();
         if(activeSource!=SOURCE_V2||msg.sender!=activeSourceAddress||!v2PairWhitelist[msg.sender]||sender!=address(this)) revert InvalidCaller();
         if(amount0>0&&amount1>0) revert InvalidAmount();
         (Execution memory e,Call[] memory c,Approval[] memory ap,bytes memory sig)=abi.decode(data,(Execution,Call[],Approval[],bytes));
@@ -284,55 +277,58 @@ contract AegisFlashLoanExecutor is EIP712,Ownable,ReentrancyGuard,Pausable,IUnis
         _run(ap,c);
         uint256 bal=IERC20(e.asset).balanceOf(address(this));
         uint256 required=activeBaseline+repayment+e.relayerFeeCap+e.minProfit;
-        if(bal<required) revert ProfitInvariantFailed(required,bal);
+        if(bal<required) revert InsufficientProfit(bal,required);
         if(e.relayerFeeCap>0) IERC20(e.asset).safeTransfer(e.feeRecipient,e.relayerFeeCap);
         IERC20(e.asset).safeTransfer(msg.sender,repayment);
         uint256 post=IERC20(e.asset).balanceOf(address(this));
         uint256 requiredPost=activeBaseline+e.minProfit;
-        if(post<requiredPost) revert ProfitInvariantFailed(requiredPost,post);
+        if(post<requiredPost) revert InsufficientProfit(post,requiredPost);
         emit ExecutionCompleted(e.nonce,e.asset,borrowed,fee,e.relayerFeeCap,post-activeBaseline,e.routeHash);
     }
 
     function uniswapV3FlashCallback(uint256 fee0,uint256 fee1,bytes calldata data) external override onlyActive {
-        if(msg.sig!=0xe9cbafb0) revert InvalidCaller();
+        if(msg.sig!=UNISWAP_V3_CALLBACK_SELECTOR) revert InvalidCaller();
         if(activeSource!=SOURCE_V3||msg.sender!=activeSourceAddress) revert InvalidCaller();
         _assertCanonicalV3Pool(msg.sender);
         if(fee0>0&&fee1>0) revert InvalidAmount();
         (Execution memory e,Call[] memory c,Approval[] memory ap,bytes memory sig)=abi.decode(data,(Execution,Call[],Approval[],bytes));
         _validateCallback(e,c,ap,sig);
-        uint256 fee=e.asset==IUniswapV3Pool(msg.sender).token0()?fee0:fee1;
+        address token0=IUniswapV3Pool(msg.sender).token0();
+        address token1=IUniswapV3Pool(msg.sender).token1();
+        uint256 fee;
+        if(e.asset==token0) fee=fee0;
+        else if(e.asset==token1) fee=fee1;
+        else revert InvalidAmount();
+        if(fee==0) revert InvalidAmount();
         _run(ap,c);
         uint256 bal=IERC20(e.asset).balanceOf(address(this));
         uint256 required=activeBaseline+e.amount+fee+e.relayerFeeCap+e.minProfit;
-        if(bal<required) revert ProfitInvariantFailed(required,bal);
+        if(bal<required) revert InsufficientProfit(bal,required);
         if(e.relayerFeeCap>0) IERC20(e.asset).safeTransfer(e.feeRecipient,e.relayerFeeCap);
         IERC20(e.asset).safeTransfer(msg.sender,e.amount+fee);
         uint256 post=IERC20(e.asset).balanceOf(address(this));
         uint256 requiredPost=activeBaseline+e.minProfit;
-        if(post<requiredPost) revert ProfitInvariantFailed(requiredPost,post);
+        if(post<requiredPost) revert InsufficientProfit(post,requiredPost);
         emit ExecutionCompleted(e.nonce,e.asset,e.amount,fee,e.relayerFeeCap,post-activeBaseline,e.routeHash);
     }
 
     function _settleSingle(Execution memory e,address token,uint256 amount,uint256 premium,address lender) internal {
-        _runNoop();
         uint256 bal=IERC20(token).balanceOf(address(this));
         uint256 required=activeBaseline+amount+premium+e.relayerFeeCap+e.minProfit;
-        if(bal<required) revert ProfitInvariantFailed(required,bal);
+        if(bal<required) revert InsufficientProfit(bal,required);
         if(e.relayerFeeCap>0) IERC20(token).safeTransfer(e.feeRecipient,e.relayerFeeCap);
         IERC20(token).forceApprove(lender,amount+premium);
         uint256 post=IERC20(token).balanceOf(address(this));
         uint256 requiredPost=activeBaseline+amount+premium+e.minProfit;
-        if(post<requiredPost) revert ProfitInvariantFailed(requiredPost,post);
+        if(post<requiredPost) revert InsufficientProfit(post,requiredPost);
         emit ExecutionCompleted(e.nonce,token,amount,premium,e.relayerFeeCap,post-activeBaseline-amount-premium,e.routeHash);
     }
-
-    function _runNoop() internal pure {}
 
     function _run(Approval[] memory ap,Call[] memory c) internal {
         for(uint256 i=0;i<ap.length;i++){ if(ap[i].token==address(0)||ap[i].spender==address(0)||!targetWhitelist[ap[i].spender]) revert TargetNotAllowed(); IERC20(ap[i].token).forceApprove(ap[i].spender,ap[i].amount); }
         for(uint256 i=0;i<c.length;i++){
             if(c[i].target==address(0)||!targetWhitelist[c[i].target]||c[i].value!=0||c[i].data.length<4) revert TargetNotAllowed();
-            bytes4 s; assembly { s := mload(add(c[i].data, 32)) }
+            bytes4 s; assembly ("memory-safe") { s := mload(add(c[i].data, 0x20)) }
             if(!selectorWhitelist[c[i].target][s]) revert SelectorNotAllowed();
             (bool ok,bytes memory r)=c[i].target.call(c[i].data); if(!ok) assembly { revert(add(r,32),mload(r)) }
         }
