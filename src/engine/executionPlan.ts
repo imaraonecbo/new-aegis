@@ -1,0 +1,4 @@
+import {keccak256,AbiCoder,Wallet} from "ethers";import {domain,types,ExecutionIntent} from "../crypto/signer";
+export type Call={target:string;value:bigint;data:string};export type Approval={token:string;spender:string;amount:bigint};
+export function routeHash(c:Call[],a:Approval[]){return keccak256(new AbiCoder().encode(["tuple(address target,uint256 value,bytes data)[]","tuple(address token,address spender,uint256 amount)[]"],[c.map(x=>[x.target,x.value,x.data]),a.map(x=>[x.token,x.spender,x.amount])]));}
+export async function signIntent(i:ExecutionIntent){return new Wallet(process.env.EXECUTION_SIGNER_PRIVATE_KEY!).signTypedData(domain,types,i)}
