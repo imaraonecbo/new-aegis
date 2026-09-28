@@ -259,7 +259,7 @@ describe("AegisFlashLoanExecutor - real Arbitrum fork", function () {
     const pairContract = new ethers.Contract(pair, V2_PAIR_ABI, ethers.provider);
     const token0 = await pairContract.token0();
 
-    const amount = ethers.parseEther("0.001");
+    const amount = ethers.parseEther("0.0001");
     const amount0Out = token0.toLowerCase() === WETH.toLowerCase() ? amount : 0n;
     const amount1Out = amount0Out === 0n ? amount : 0n;
 
