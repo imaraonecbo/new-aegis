@@ -1,0 +1,3 @@
+import {JsonRpcProvider,Wallet} from "ethers";import {env} from "../config/env";
+export async function submitPrivate(rawTransaction:string,targetBlock:number){const p=new JsonRpcProvider(env.ARBITRUM_PRIVATE_RPC_URL,42161,{staticNetwork:true});const now=await p.getBlockNumber();if(targetBlock!==now+1)throw new Error("Target block is stale; aborting");const hash=await p.send(env.PRIVATE_RPC_METHOD,[rawTransaction]);if(typeof hash!=="string")throw new Error("Private submission failed");return hash}
+export async function signRawTransaction(tx:Parameters<Wallet["signTransaction"]>[0]){return new Wallet(env.EXECUTOR_PRIVATE_KEY).signTransaction(tx)}
