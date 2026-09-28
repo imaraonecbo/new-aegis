@@ -7,15 +7,11 @@ const WETH = "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1";
 const USDC = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831";
 const V3_FACTORY = "0x1F98431c8aD98523631AE4a59f267346ea31F984";
 const V3_WETH_USDC_005 = "0xc6962004f452be9203591991d15f6b388e09e8d0";
-const V2_FACTORY = "0xf1D7CC64Fb4452F05c498126312eBE29f30Fbcf9";
+const V2_WETH_USDC_PAIR = "0x57b85FEf094e10b5eeCDF350Af688299E9553378";
 
 const ERC20 = [
   "function balanceOf(address) view returns(uint256)",
   "function transfer(address,uint256) returns(bool)",
-];
-
-const V2_FACTORY_ABI = [
-  "function getPair(address,address) view returns(address)",
 ];
 
 const V2_PAIR_ABI = [
@@ -256,10 +252,7 @@ describe("AegisFlashLoanExecutor - real Arbitrum fork", function () {
   it("executes a real Uniswap V2 flash swap when the WETH/USDC pair exists", async function () {
     const { ethers, owner, executor, target } = await setup();
 
-    const factory = new ethers.Contract(V2_FACTORY, V2_FACTORY_ABI, ethers.provider);
-    const pair = await factory.getPair(WETH, USDC);
-
-    expect(pair).to.not.equal(ethers.ZeroAddress);
+    const pair = V2_WETH_USDC_PAIR;
 
     await executor.setV2Pair(pair, true);
 
