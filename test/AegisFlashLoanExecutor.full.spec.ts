@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { expect } from "chai";
 import { network } from "hardhat";
 const AAVE=process.env.AAVE_V3_POOL||"0x794a61358D6845594F94dc1DB02A252b5b4814aD";
@@ -9,7 +10,7 @@ describe("AegisFlashLoanExecutor Arbitrum verification",function(){
  it("binds EIP-712 domain to chain and contract",async()=>{const {ethers,c}=await deploy();const dom=await c.DOMAIN_SEPARATOR();const off=ethers.TypedDataEncoder.hashDomain({name:"AegisEngine",version:"1",chainId:42161,verifyingContract:await c.getAddress()});expect(dom).to.equal(off);});
  it("rejects unauthorized relayer",async()=>{const {c,attacker}=await deploy();expect(await c.authorizedRelayers(attacker.address)).to.equal(false);});
  it("rejects an expired or reused nonce at the contract state boundary",async()=>{const {c}=await deploy();expect(await c.usedNonces(1)).to.equal(false);});
- it("enforces target and selector whitelists before arbitrary calls",async()=>{const {c,owner}=await deploy();const target="0x0000000000000000000000000000000000000001";await c.setTarget(target,true);expect(await c.targetWhitelist(target)).to.equal(true);expect(await c.selectorWhitelist(target,"0x12345678")).to.equal(false);});
+ it("enforces target and selector whitelists before arbitrary calls",async()=>{const {c}=await deploy();const target="0x0000000000000000000000000000000000000001";await c.setTarget(target,true);expect(await c.targetWhitelist(target)).to.equal(true);expect(await c.selectorWhitelist(target,"0x12345678")).to.equal(false);});
  it("enforces pause as a circuit breaker",async()=>{const {c}=await deploy();await c.pause();expect(await c.paused()).to.equal(true);await c.unpause();expect(await c.paused()).to.equal(false);});
  it("contains the required flash-loan venue endpoints",async()=>{const {c}=await deploy();expect(await c.AAVE_POOL()).to.equal(AAVE);expect(await c.BALANCER_VAULT()).to.equal(BAL);});
 });
