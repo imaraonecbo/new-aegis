@@ -16,9 +16,15 @@ function getAccounts() {
 }
 
 const rpc = process.env.ARBITRUM_MAINNET_RPC?.trim();
+const forkRpc = rpc || "https://arb1.arbitrum.io/rpc";
+
 const solidityConfig = {
   version: "0.8.26",
-  settings: { evmVersion: "cancun", viaIR: true, optimizer: { enabled: true, runs: 200 } },
+  settings: {
+    evmVersion: "cancun",
+    viaIR: true,
+    optimizer: { enabled: true, runs: 200 },
+  },
 };
 
 export default defineConfig({
@@ -26,10 +32,33 @@ export default defineConfig({
   test: { mocha: { timeout: 180_000 } },
   solidity: { profiles: { default: solidityConfig, production: solidityConfig } },
   networks: {
-    hardhat: { type: "edr-simulated", chainId: 42161, ...(rpc ? { forking: { url: rpc } } : {}) },
-    local: { type: "edr-simulated", chainId: 42161 },
-    arbitrumFork: { type: "edr-simulated", chainId: 42161, ...(rpc ? { forking: { url: rpc } } : {}) },
-    arbitrum: { type: "http", chainId: 42161, url: rpc || "https://arb1.arbitrum.io/rpc", accounts: getAccounts() },
+    // The default test network is intentionally forked from Arbitrum One.
+    // This prevents the real-fork suite from silently running on an empty EDR chain
+    // with chainId 42161 but no Arbitrum state.
+    hardhat: {
+      type: "edr-simulated",
+      chainId: 42161,
+      forking: { url: forkRpc },
+    },
+    local: {
+      type: "edr-simulated",
+      chainId: 42161,
+    },
+    arbitrumFork: {
+      type: "edr-simulated",
+      chainId: 42161,
+      forking: { url: forkRpc },
+    },
+    arbitrum: {
+      type: "http",
+      chainId: 42161,
+      url: forkRpc,
+      accounts: getAccounts(),
+    },
   },
-  verify: { etherscan: { apiKey: process.env.ARBISCAN_API_KEY || "" } },
+  verify: {
+    etherscan: {
+      apiKey: process.env.ARBISCAN_API_KEY || "",
+    },
+  },
 });
