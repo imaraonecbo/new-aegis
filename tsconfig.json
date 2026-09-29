@@ -14,11 +14,11 @@
   },
   "include": [
     "hardhat.config.ts",
-    "scripts/**/*"
+    "scripts/**/*",
+    "test/**/*"
   ],
   "exclude": [
     "node_modules",
-    "test/**/*",
     "src/**/*",
     "server.ts",
     "dist",
