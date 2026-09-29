@@ -281,8 +281,9 @@ describe("AegisFlashLoanExecutor - real Arbitrum fork", function () {
     ]);
 
     const pairTokens = [token0.toLowerCase(), token1.toLowerCase()];
-    if (!pairTokens.includes(WETH.toLowerCase()) || !pairTokens.includes(USDC.toLowerCase())) {
-      throw new Error("Configured Arbitrum V2 pair is not a WETH/native-USDC pair.");
+    const usdcCandidates = [USDC.toLowerCase(), ARBITRUM_ADDRESSES.USDC_BRIDGED.toLowerCase()];
+    if (!pairTokens.includes(WETH.toLowerCase()) || !pairTokens.some((token) => usdcCandidates.includes(token))) {
+      throw new Error("Configured Arbitrum V2 pair is not a WETH/USDC pair using native or bridged USDC.");
     }
     if (reserves[0] === 0n || reserves[1] === 0n) {
       throw new Error("Configured Arbitrum V2 pair has no liquidity.");
