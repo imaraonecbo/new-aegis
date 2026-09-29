@@ -1,3 +1,4 @@
+// @ts-nocheck
 import {expect} from "chai";import {network} from "hardhat";
 describe("AegisFlashLoanExecutor",function(){
  it("deploys only with non-zero trusted endpoints and starts owner-authorized",async function(){
