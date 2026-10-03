@@ -4,8 +4,8 @@ import { privateKeyToAccount } from "viem/accounts";
 import { arbitrum } from "viem/chains";
 import type { Address, Hex } from "viem";
 import { Contract, JsonRpcProvider } from "ethers";
-import { env } from "../config/env";
-import { simulatePrivate } from "../simulators/ethSimulate";
+import { env } from "../config/env.js";
+import { simulatePrivate } from "../simulators/ethSimulate.js";
 import { readFile } from "node:fs/promises";
 
 const EXECUTOR_ABI = [
