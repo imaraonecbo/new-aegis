@@ -3,7 +3,7 @@ import { createSmartWalletClient, alchemyWalletTransport } from "@alchemy/wallet
 import { privateKeyToAccount } from "viem/accounts";
 import { arbitrum } from "viem/chains";
 import { Contract, JsonRpcProvider, Wallet } from "ethers";
-import { appendFile, readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 
 const required = (name: string) => {
   const value = process.env[name]?.trim();
