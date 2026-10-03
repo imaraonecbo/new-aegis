@@ -22,8 +22,7 @@ function requireAddress(value: string, name: string): Address {
 
 async function panicActive(): Promise<boolean> {
   if (process.env.AEGIS_PANIC === "true") return true;
-  try { await readFile(panicFile); return true; }
-  catch { return false; }
+  try { await readFile(panicFile); return true; } catch { return false; }
 }
 
 function hexData(value: string): Hex {
@@ -36,12 +35,11 @@ let cachedAccount: Address | undefined;
 export async function getGaslessAccount(): Promise<Address> {
   if (cachedAccount) return cachedAccount;
 
-  const key = env.AA_OWNER_PRIVATE_KEY;
-  const signer = privateKeyToAccount(key as `0x${string}`);
+  const signer = privateKeyToAccount(env.AA_OWNER_PRIVATE_KEY as `0x${string}`);
   const client = createSmartWalletClient({
-    transport: alchemyWalletTransport({ apiKey: env.ALCHEMY_API_KEY }),
+    transport: alchemyWalletTransport({ apiKey: env.ALCHEMY_API_KEY! }),
     chain: arbitrum,
-    signer,
+    signer
   });
 
   const requested = env.AA_ACCOUNT_ADDRESS
@@ -58,53 +56,53 @@ export async function executeGaslessCall(input: {
   to: string;
   data: string;
   netProfitUsd: number;
+  expectedRelayer: string;
 }): Promise<{ callId: string; account: string; maxGasToken: bigint }> {
   if (!env.AA_ENABLED) throw new Error("AA: gasless execution is disabled");
   if (await panicActive()) throw new Error("AA: global panic switch is active");
   if (input.netProfitUsd < env.MIN_PROFIT_USD) throw new Error("AA: profitability gate failed");
 
   const executor = requireAddress(env.EXECUTOR_ADDRESS, "EXECUTOR_ADDRESS");
-  const target = requireAddress(input.to, "execution target");
   const data = hexData(input.data);
-  if (target.toLowerCase() !== executor.toLowerCase()) {
-    throw new Error("AA: execution target is not the configured executor");
+
+  if (input.to.toLowerCase() !== executor.toLowerCase()) {
+    throw new Error("AA: execution target must be the configured executor");
   }
 
-  const account = await getGaslessAccount();\n  if (input.expectedRelayer.toLowerCase() !== account.toLowerCase()) {\n    throw new Error(`AA: EIP-712 relayer ${input.expectedRelayer} does not match smart account ${account}`);\n  }
+  const account = await getGaslessAccount();
+  if (input.expectedRelayer.toLowerCase() !== account.toLowerCase()) {
+    throw new Error(`AA: EIP-712 relayer ${input.expectedRelayer} does not match smart account ${account}`);
+  }
 
-  const readProvider = new JsonRpcProvider(env.ARBITRUM_RPC_URL, 42161, { staticNetwork: true });
-  const network = await readProvider.getNetwork();
+  const provider = new JsonRpcProvider(env.ARBITRUM_RPC_URL, 42161, { staticNetwork: true });
+  const network = await provider.getNetwork();
   if (network.chainId !== 42161n) throw new Error(`AA: wrong chain ${network.chainId}`);
 
-  const executorContract = new Contract(executor, EXECUTOR_ABI, readProvider);
+  const executorContract = new Contract(executor, EXECUTOR_ABI, provider);
   if (await executorContract.paused()) throw new Error("AA: executor is paused");
   if (!(await executorContract.authorizedRelayers(account))) {
     throw new Error("AA: smart account is not an authorized executor relayer");
   }
 
-  await simulatePrivate({
-    from: account,
-    to: executor,
-    data
-  });
+  await simulatePrivate({ from: account, to: executor, data });
 
   if (await panicActive()) throw new Error("AA: panic switch activated during preparation");
 
   const client = createSmartWalletClient({
-    transport: alchemyWalletTransport({ apiKey: env.ALCHEMY_API_KEY }),
+    transport: alchemyWalletTransport({ apiKey: env.ALCHEMY_API_KEY! }),
     chain: arbitrum,
     signer: privateKeyToAccount(env.AA_OWNER_PRIVATE_KEY as `0x${string}`)
   });
 
-  const prepared = await client.prepareCalls({
+  const prepared: any = await client.prepareCalls({
     account,
     calls: [{ to: executor, value: 0n, data }],
     capabilities: {
       paymaster: {
-        policyId: env.ALCHEMY_POLICY_ID,
+        policyId: env.ALCHEMY_POLICY_ID!,
         erc20: {
-          tokenAddress: requireAddress(env.AA_GAS_TOKEN_ADDRESS, "AA_GAS_TOKEN_ADDRESS"),
-          maxTokenAmount: env.AA_MAX_GAS_TOKEN_AMOUNT,
+          tokenAddress: requireAddress(env.AA_GAS_TOKEN_ADDRESS!, "AA_GAS_TOKEN_ADDRESS"),
+          maxTokenAmount: env.AA_MAX_GAS_TOKEN_AMOUNT!,
           postOpSettings: { autoApprove: true }
         }
       }
@@ -112,25 +110,46 @@ export async function executeGaslessCall(input: {
   });
 
   if (prepared.type === "paymaster-permit") {
-    throw new Error("AA: paymaster requested an interactive permit; refusing headless execution");
+    throw new Error("AA: interactive paymaster permit requested; refusing headless execution");
   }
 
-  const feePayment = (prepared as any).feePayment ?? ((prepared as any).data?.find?.((x: any) => x?.feePayment)?.feePayment);
-  if (!feePayment || feePayment.sponsored) {
-    if (!feePayment) throw new Error("AA: paymaster returned no fee quote");
+  const feePayment = prepared.feePayment ??
+    (Array.isArray(prepared.data) ? prepared.data.find((x: any) => x?.feePayment)?.feePayment : undefined);
+
+  if (!feePayment) throw new Error("AA: paymaster returned no ERC-20 fee quote");
+  if (feePayment.sponsored === true) {
+    throw new Error("AA: policy returned native-gas sponsorship instead of ERC-20 settlement");
   }
 
-  const maxGasToken = feePayment.maxAmount;
-  if (feePayment.tokenAddress.toLowerCase() !== env.AA_GAS_TOKEN_ADDRESS.toLowerCase()) {
+  const tokenAddress = requireAddress(env.AA_GAS_TOKEN_ADDRESS!, "AA_GAS_TOKEN_ADDRESS");
+  if (String(feePayment.tokenAddress).toLowerCase() !== tokenAddress.toLowerCase()) {
     throw new Error("AA: paymaster returned an unexpected gas token");
   }
-  if (maxGasToken > env.AA_MAX_GAS_TOKEN_AMOUNT) {
+
+  const maxGasToken = BigInt(feePayment.maxAmount);
+  if (maxGasToken > env.AA_MAX_GAS_TOKEN_AMOUNT!) {
     throw new Error(`AA: gas-token quote exceeds cap: ${maxGasToken} > ${env.AA_MAX_GAS_TOKEN_AMOUNT}`);
+  }
+
+  const preparedData = Array.isArray(prepared.data)
+    ? prepared.data.find((x: any) =>
+        x?.type === "user-operation-v070" || x?.type === "user-operation-v060"
+      )
+    : prepared;
+
+  const maxFeePerGas = preparedData?.data?.maxFeePerGas;
+  if (
+    maxFeePerGas !== undefined &&
+    env.AA_MAX_FEE_PER_GAS_WEI &&
+    BigInt(maxFeePerGas) > env.AA_MAX_FEE_PER_GAS_WEI
+  ) {
+    throw new Error(`AA: maxFeePerGas exceeds cap: ${maxFeePerGas} > ${env.AA_MAX_FEE_PER_GAS_WEI}`);
   }
 
   if (await panicActive()) throw new Error("AA: panic switch activated before signing");
 
-  const preparedData = Array.isArray((prepared as any).data) ? (prepared as any).data.find((x: any) => x.type === "user-operation-v070" || x.type === "user-operation-v060") : prepared;\n  const maxFeePerGas = preparedData?.data?.maxFeePerGas;\n  if (maxFeePerGas !== undefined && env.AA_MAX_FEE_PER_GAS_WEI && maxFeePerGas > env.AA_MAX_FEE_PER_GAS_WEI) {\n    throw new Error(`AA: maxFeePerGas exceeds cap: ${maxFeePerGas} > ${env.AA_MAX_FEE_PER_GAS_WEI}`);\n  }\n\n  const signed = await client.signPreparedCalls(prepared);
+  const signed = await client.signPreparedCalls(prepared);
+
   if (await panicActive()) throw new Error("AA: panic switch activated before broadcast");
 
   const sent = await client.sendPreparedCalls({ signedCalls: signed });
