@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "esModuleInterop": true
+  },
+  "include": [
+    "src/aa/**/*.ts",
+    "src/config/env.ts",
+    "src/crypto/signer.ts",
+    "src/simulators/ethSimulate.ts",
+    "src/engine/runner.ts",
+    "scripts/provisionGaslessAccount.ts"
+  ]
+}
