@@ -1,1 +1,1 @@
-export { getGaslessAccount, executeGaslessCall } from "./gaslessExecution";
+export { getGaslessAccount, executeGaslessCall } from "./gaslessExecution.js";
