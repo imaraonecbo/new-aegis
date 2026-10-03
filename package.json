@@ -22,7 +22,8 @@
     "deploy:arbitrum": "hardhat run scripts/deploy.ts --network arbitrum",
     "verify:arbitrum": "hardhat run --build-profile production scripts/verify.ts --network arbitrum",
     "deploy:production": "npm run build:contracts && npm run deploy:arbitrum && npm run verify:arbitrum && npm run smoke-test",
-    "aa:provision": "tsx scripts/provisionGaslessAccount.ts"
+    "aa:provision": "tsx scripts/provisionGaslessAccount.ts",
+    "aa:panic": "tsx scripts/aegisPanic.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
