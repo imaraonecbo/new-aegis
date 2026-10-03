@@ -130,7 +130,7 @@ export async function executeGaslessCall(input: {
 
   if (await panicActive()) throw new Error("AA: panic switch activated before signing");
 
-  const signed = await client.signPreparedCalls(prepared);
+  const preparedData = Array.isArray((prepared as any).data) ? (prepared as any).data.find((x: any) => x.type === "user-operation-v070" || x.type === "user-operation-v060") : prepared;\n  const maxFeePerGas = preparedData?.data?.maxFeePerGas;\n  if (maxFeePerGas !== undefined && env.AA_MAX_FEE_PER_GAS_WEI && maxFeePerGas > env.AA_MAX_FEE_PER_GAS_WEI) {\n    throw new Error(`AA: maxFeePerGas exceeds cap: ${maxFeePerGas} > ${env.AA_MAX_FEE_PER_GAS_WEI}`);\n  }\n\n  const signed = await client.signPreparedCalls(prepared);
   if (await panicActive()) throw new Error("AA: panic switch activated before broadcast");
 
   const sent = await client.sendPreparedCalls(signed);
