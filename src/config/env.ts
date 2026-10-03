@@ -29,7 +29,7 @@ const schema=z.object({
  AA_OWNER_PRIVATE_KEY:hexKey.optional(),
  AA_ACCOUNT_ADDRESS:address.optional(),
  AA_GAS_TOKEN_ADDRESS:address.optional(),
- AA_MAX_GAS_TOKEN_AMOUNT:z.coerce.bigint().positive().optional(),
+ AA_MAX_GAS_TOKEN_AMOUNT:z.coerce.bigint().positive().optional(),\n AA_MAX_FEE_PER_GAS_WEI:z.coerce.bigint().positive().optional(),
  AEGIS_PANIC_FILE:z.string().default("runtime/aegis.panic"),
  SENTRY_DSN:z.string().url().optional(),
  ALERT_WEBHOOK_URL:z.string().url().optional()
