@@ -115,7 +115,7 @@ export async function executeGaslessCall(input: {
     throw new Error("AA: paymaster requested an interactive permit; refusing headless execution");
   }
 
-  const feePayment = prepared.feePayment;
+  const feePayment = (prepared as any).feePayment ?? ((prepared as any).data?.find?.((x: any) => x?.feePayment)?.feePayment);
   if (!feePayment || feePayment.sponsored) {
     if (!feePayment) throw new Error("AA: paymaster returned no fee quote");
   }
@@ -133,7 +133,7 @@ export async function executeGaslessCall(input: {
   const preparedData = Array.isArray((prepared as any).data) ? (prepared as any).data.find((x: any) => x.type === "user-operation-v070" || x.type === "user-operation-v060") : prepared;\n  const maxFeePerGas = preparedData?.data?.maxFeePerGas;\n  if (maxFeePerGas !== undefined && env.AA_MAX_FEE_PER_GAS_WEI && maxFeePerGas > env.AA_MAX_FEE_PER_GAS_WEI) {\n    throw new Error(`AA: maxFeePerGas exceeds cap: ${maxFeePerGas} > ${env.AA_MAX_FEE_PER_GAS_WEI}`);\n  }\n\n  const signed = await client.signPreparedCalls(prepared);
   if (await panicActive()) throw new Error("AA: panic switch activated before broadcast");
 
-  const sent = await client.sendPreparedCalls(signed);
+  const sent = await client.sendPreparedCalls({ signedCalls: signed });
   const callId = sent.id;
   if (!callId) throw new Error("AA: Wallet API returned no call ID");
 
