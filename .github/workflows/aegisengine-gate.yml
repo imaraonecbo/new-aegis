@@ -6,7 +6,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with:{node-version:22,cache:npm}
+        with:
+          node-version:22
+          cache:npm
       - run: npm install
       - run: npm run contract:compile
       - run: npm run contract:test
+      - run: npx tsc --noEmit -p tsconfig.aa.json
