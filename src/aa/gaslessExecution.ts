@@ -70,7 +70,7 @@ export async function executeGaslessCall(input: {
     throw new Error("AA: execution target is not the configured executor");
   }
 
-  const account = await getGaslessAccount();
+  const account = await getGaslessAccount();\n  if (input.expectedRelayer.toLowerCase() !== account.toLowerCase()) {\n    throw new Error(`AA: EIP-712 relayer ${input.expectedRelayer} does not match smart account ${account}`);\n  }
 
   const readProvider = new JsonRpcProvider(env.ARBITRUM_RPC_URL, 42161, { staticNetwork: true });
   const network = await readProvider.getNetwork();
