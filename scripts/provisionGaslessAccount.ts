@@ -70,8 +70,7 @@ if (persist) {
   const line = `AA_ACCOUNT_ADDRESS=${aaAddress}`;
   const re = /^AA_ACCOUNT_ADDRESS=.*$/m;
   const updated = re.test(current) ? current.replace(re, line) : current.trimEnd() + `\n${line}\n`;
-  await appendFile(path, "");
-  await import("node:fs/promises").then(fs => fs.writeFile(path, updated, "utf8"));
+  await writeFile(path, updated, "utf8");
 }
 
 console.log(JSON.stringify({
