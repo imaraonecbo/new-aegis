@@ -3,10 +3,10 @@ import { JsonRpcProvider, Contract, TypedDataEncoder } from "ethers";
 const ABI=["function DOMAIN_SEPARATOR() view returns(bytes32)","function targetWhitelist(address) view returns(bool)","function authorizedRelayers(address) view returns(bool)","function paused() view returns(bool)"];\nconst ERC20_ABI=["function balanceOf(address) view returns(uint256)"];
 const required=(k:string)=>{const v=process.env[k];if(!v)throw new Error("Missing "+k);return v};
 const main=async()=>{
- const rpc=process.env.ARBITRUM_MAINNET_RPC||process.env.ARBITRUM_RPC_URL||required("ARBITRUM_MAINNET_RPC");const privateRpc=required("ARBITRUM_PRIVATE_RPC_URL");const address=required("EXECUTOR_ADDRESS");const aa=process.env.AA_ENABLED==="true";const relayer=aa?(process.env.AA_ACCOUNT_ADDRESS||required("AA_ACCOUNT_ADDRESS")):required("RELAYER_ADDRESS");
+ const aa=process.env.AA_ENABLED==="true";const rpc=process.env.ARBITRUM_MAINNET_RPC||process.env.ARBITRUM_RPC_URL||required("ARBITRUM_MAINNET_RPC");const privateRpc=aa?process.env.ARBITRUM_PRIVATE_RPC_URL:required("ARBITRUM_PRIVATE_RPC_URL");const address=required("EXECUTOR_ADDRESS");const relayer=aa?(process.env.AA_ACCOUNT_ADDRESS||required("AA_ACCOUNT_ADDRESS")):required("RELAYER_ADDRESS");
  const p=new JsonRpcProvider(rpc,42161,{staticNetwork:true});const t=Date.now();await p.getBlockNumber();const latency=Date.now()-t;
  if(latency>=50)throw new Error("Read RPC latency gate failed: "+latency+"ms");
- if(rpc===privateRpc)throw new Error("Private MEV RPC must not equal public/read RPC");
+ if(!aa&&rpc===privateRpc)throw new Error("Private MEV RPC must not equal public/read RPC");
  const c=new Contract(address,ABI,p);const onchain=await c.DOMAIN_SEPARATOR();
  const offchain=TypedDataEncoder.hashDomain({name:"AegisEngine",version:"1",chainId:42161,verifyingContract:address});
  if(onchain.toLowerCase()!==offchain.toLowerCase())throw new Error("EIP-712 DOMAIN_SEPARATOR mismatch");
