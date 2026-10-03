@@ -54,7 +54,7 @@ let authorized = await executorContract.authorizedRelayers(aaAddress);
 let txHash: string | null = null;
 
 if (!authorized && autoAuthorize) {
-  const tx = await executorContract.connect(deployer).setRelayer(aaAddress, true);
+  const tx = await (executorContract.connect(deployer) as any).setRelayer(aaAddress, true);
   txHash = tx.hash;
   await tx.wait(5);
   authorized = await executorContract.authorizedRelayers(aaAddress);
