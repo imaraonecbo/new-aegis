@@ -48,13 +48,12 @@ export async function executeFiveGates(o: FiveGateOpportunity) {
 
   try {
     await simulatePrivate({ from: o.from, to: o.to, data: o.calldata });
+    recordSuccessfulExecution();
   } catch (error) {
     recordSimulationFailure();
     throw error;
   }
   if (!o.rawTransaction) throw new Error("GATE_4: signed raw transaction missing");
   if (!env.PRIVATE_SUBMISSION_REQUIRED) throw new Error("GATE_5: private submission disabled");
-  const result = await submitPrivate(o.rawTransaction, o.targetBlock);
-  recordSuccessfulExecution();
-  return result;
+  return submitPrivate(o.rawTransaction, o.targetBlock);
 }
