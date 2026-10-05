@@ -32,14 +32,18 @@ export async function executeFiveGates(o: FiveGateOpportunity) {
 
   if (env.AA_ENABLED) {
     if (o.intent.feeRecipient.toLowerCase() !== o.intent.relayer.toLowerCase()) throw new Error("GATE_AA: fee recipient must equal AA relayer");
-    const result = await executeGaslessCall({
-      to: o.to,
-      data: o.calldata,
-      netProfitUsd: o.netProfitUsd,
-      expectedRelayer: o.intent.relayer
-    });
-    recordSuccessfulExecution();
-    return result;
+    try {
+      const result = await executeGaslessCall({
+        to: o.to,
+        data: o.calldata,
+        netProfitUsd: o.netProfitUsd,
+        expectedRelayer: o.intent.relayer
+      });
+      return result;
+    } catch (error) {
+      recordSimulationFailure();
+      throw error;
+    }
   }
 
   try {
