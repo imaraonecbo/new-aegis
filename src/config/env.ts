@@ -35,7 +35,16 @@ const schema = z.object({
   AA_MAX_FEE_PER_GAS_WEI: z.coerce.bigint().positive().optional(),
   AEGIS_PANIC_FILE: z.string().default("runtime/aegis.panic"),
   SENTRY_DSN: z.string().url().optional(),
-  ALERT_WEBHOOK_URL: z.string().url().optional()
+  ALERT_WEBHOOK_URL: z.string().url().optional(),
+  MAX_QUOTE_AGE_MS: z.coerce.number().int().positive().default(1500),
+  MAX_PRICE_MOVE_BPS: z.coerce.number().nonnegative().default(25),
+  MAX_SLIPPAGE_BPS: z.coerce.number().nonnegative().default(30),
+  MAX_PRICE_IMPACT_BPS: z.coerce.number().nonnegative().default(50),
+  GAS_RESERVE_MULTIPLIER: z.coerce.number().positive().default(1.5),
+  MAX_CONSECUTIVE_FAILURES: z.coerce.number().int().positive().default(3),
+  DAILY_LOSS_LIMIT_USD: z.coerce.number().positive().default(25),
+  RISK_PANIC_ENABLED: b.default("true"),
+  AEGIS_RISK_STATE_FILE: z.string().default("runtime/aegis-risk-state.json")
 }).superRefine((v, c) => {
   if (v.CHAIN_ID !== 42161) c.addIssue({ code: "custom", path: ["CHAIN_ID"], message: "Arbitrum One only" });
   if (v.ENGINE_ENABLED && v.ENGINE_DRY_RUN) c.addIssue({ code: "custom", path: ["ENGINE_DRY_RUN"], message: "Live engine cannot be dry-run" });
