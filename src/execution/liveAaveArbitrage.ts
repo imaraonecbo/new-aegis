@@ -6,6 +6,7 @@ import { TOKENS } from "../../server/chain/constants.js";
 import { getUniswapV3Quotes } from "../../server/scanner/uniswapV3.js";
 
 const SWAP_ROUTER_02 = "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45";
+const AAVE_ABI = ["function FLASHLOAN_PREMIUM_TOTAL() view returns (uint128)"];
 const EXECUTOR_ABI = [
   "function executeFlashLoan((address asset,uint256 amount,uint256 minProfit,uint256 relayerFeeCap,address relayer,address feeRecipient,uint256 nonce,uint256 deadline,uint256 targetBlock,bytes32 routeHash) e,(address target,uint256 value,bytes data)[] c,(address token,address spender,uint256 amount)[] a,bytes sig)",
   "function targetWhitelist(address) view returns (bool)",
@@ -60,6 +61,9 @@ export async function buildAndExecuteWethArb(testSizeWeth:number){
   }
   if(!best) throw new Error("NO_ROUND_TRIP_ROUTE");
 
+  const aavePool=new Contract("0x794a61358D6845594F94dc1DB02A252b5b4814aD",AAVE_ABI,provider);
+  const premiumBps=Number(await aavePool.FLASHLOAN_PREMIUM_TOTAL());
+  const flashLoanFee=amount*BigInt(premiumBps)/10000n;
   const currentBlock=await provider.getBlockNumber();
   const targetBlock=currentBlock+env.TARGET_BLOCK_OFFSET;
   const deadline=BigInt(Math.floor(Date.now()/1000)+20);
@@ -67,7 +71,8 @@ export async function buildAndExecuteWethArb(testSizeWeth:number){
   const relayerFeeCap=BigInt(Math.ceil(Number(amount)*env.RELAYER_FEE_CAP_BPS/10000));
   const nonce=BigInt(Date.now())*1000n;
   const ethUsd=Number(best.usdcOut)/1e6/testSizeWeth;
-  const minProfit=BigInt(Math.ceil(Math.max(env.MIN_PROFIT_USD,1)/Math.max(ethUsd,1)*1e18));
+  const requiredProfit=BigInt(Math.ceil(Math.max(env.MIN_PROFIT_USD,1)/Math.max(ethUsd,1)*1e18));
+  const minProfit=requiredProfit+flashLoanFee;
   const desiredUsdc=bpsDown(best.usdcOut,env.MAX_SLIPPAGE_BPS);
 
   const swapInterface=new Contract(SWAP_ROUTER_02,SWAP_ABI).interface;
@@ -121,7 +126,7 @@ export async function buildAndExecuteWethArb(testSizeWeth:number){
   const risk={
     quoteTimestampMs:Date.now(),quoteBlock:currentBlock,currentBlock,targetBlock,
     expectedGrossProfitUsd:grossProfitUsd,principalUsd:testSizeWeth*ethUsd,
-    dexFeesUsd:0,flashLoanFeeUsd:0,gasCostUsd:0,gasReserveUsd:0,aaFeeUsd:0,
+    dexFeesUsd:0,flashLoanFeeUsd:Number(flashLoanFee)/1e18*ethUsd,gasCostUsd:0,gasReserveUsd:0,aaFeeUsd:0,
     slippageBps:env.MAX_SLIPPAGE_BPS,priceImpactBps:0,priceMoveBps:0,
     expectedOutputUsd:Number(best.wethBack)/1e18*ethUsd
   };
