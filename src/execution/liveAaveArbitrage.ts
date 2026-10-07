@@ -119,10 +119,12 @@ export async function buildAndExecuteWethArb(testSizeWeth:number){
 
   const grossProfitUsd=Math.max(0,(Number(best.wethBack)-Number(amount))/1e18*ethUsd);
   const risk={
-    quoteAgeMs:0,priceMoveBps:0,slippageBps:env.MAX_SLIPPAGE_BPS,
-    priceImpactBps:0,gasCostUsd:0,gasReserveOk:true,netProfitUsd:grossProfitUsd,
-    dailyLossUsd:0,consecutiveFailures:0
-  } as FiveGateOpportunity["risk"];
+    quoteTimestampMs:Date.now(),quoteBlock:currentBlock,currentBlock,targetBlock,
+    expectedGrossProfitUsd:grossProfitUsd,principalUsd:testSizeWeth*ethUsd,
+    dexFeesUsd:0,flashLoanFeeUsd:0,gasCostUsd:0,gasReserveUsd:0,aaFeeUsd:0,
+    slippageBps:env.MAX_SLIPPAGE_BPS,priceImpactBps:0,priceMoveBps:0,
+    expectedOutputUsd:Number(best.wethBack)/1e18*ethUsd
+  };
 
   const opportunity:FiveGateOpportunity={
     from:relayer.address,to:env.EXECUTOR_ADDRESS,calldata:data,rawTransaction,
