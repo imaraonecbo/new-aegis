@@ -102,7 +102,7 @@ contract AegisFlashLoanExecutor is EIP712,Ownable,ReentrancyGuard,Pausable,IUnis
     address public treasury;
 
     constructor(address aave,address balancer,address owner_) EIP712("AegisEngine","1") Ownable(owner_) {
-        if(aave==address(0)||balancer==address(0)||owner_==address(0)) revert ZeroAddress();
+        if(aave==address(0)||owner_==address(0)) revert ZeroAddress();
         AAVE_POOL=IAaveV3Pool(aave);
         BALANCER_VAULT=IBalancerVault(balancer);
         treasury=owner_;
@@ -152,6 +152,7 @@ contract AegisFlashLoanExecutor is EIP712,Ownable,ReentrancyGuard,Pausable,IUnis
         Approval[] calldata a,
         bytes calldata sig
     ) external nonReentrant whenNotPaused onlyRelayer {
+        if(address(BALANCER_VAULT)==address(0)) revert InvalidCaller();
         if(tokens.length==0||tokens.length!=amounts.length||e.amount==0) revert InvalidArrayLength();
         _validate(e,c,a,sig,msg.sender);
         uint256[] memory baselines=new uint256[](tokens.length);
@@ -258,7 +259,7 @@ contract AegisFlashLoanExecutor is EIP712,Ownable,ReentrancyGuard,Pausable,IUnis
         external onlyActive
     {
         if(msg.sig!=BALANCER_CALLBACK_SELECTOR) revert InvalidCaller();
-        if(activeSource!=SOURCE_BALANCER||msg.sender!=address(BALANCER_VAULT)||tokens.length==0||tokens.length!=amounts.length||tokens.length!=feeAmounts.length) revert InvalidCaller();
+        if(address(BALANCER_VAULT)==address(0)||activeSource!=SOURCE_BALANCER||msg.sender!=address(BALANCER_VAULT)||tokens.length==0||tokens.length!=amounts.length||tokens.length!=feeAmounts.length) revert InvalidCaller();
         (Execution memory e,address[] memory dataTokens,uint256[] memory dataAmounts,uint256[] memory baselines,Call[] memory c,Approval[] memory ap,bytes memory sig)=abi.decode(p,(Execution,address[],uint256[],uint256[],Call[],Approval[],bytes));
         if(dataTokens.length!=tokens.length||dataAmounts.length!=tokens.length||baselines.length!=tokens.length) revert InvalidArrayLength();
         if(keccak256(abi.encode(tokens,amounts))!=activeLoanHash) revert InvalidRoute();
