@@ -21,13 +21,13 @@ if (!deployer) throw new Error("No deployer signer is configured. Set PRIVATE_KE
 const networkInfo = await provider.getNetwork();
 if (networkInfo.chainId !== BigInt(chainId)) throw new Error(`Refusing deployment: expected chain ${chainId}, got ${networkInfo.chainId}`);
 
-const deployerAddress = await deployer.getAddress();
 const balance = await provider.getBalance(deployerAddress);
 if (balance === 0n && process.env.REQUIRE_DEPLOYER_FUNDS === "true") throw new Error("Deployer has zero native balance and REQUIRE_DEPLOYER_FUNDS=true.");
 
 const aave = address("AAVE_V3_POOL");
 const balancer = optionalAddress("BALANCER_VAULT");
-const relayer = address("RELAYER_ADDRESS");
+const deployerAddress = await deployer.getAddress();
+const relayer = optionalAddress("RELAYER_ADDRESS") || deployerAddress;
 const name = process.env.EIP712_NAME || "AegisEngine";
 const version = process.env.EIP712_VERSION || "1";
 if (name !== "AegisEngine" || version !== "1") throw new Error("EIP712_NAME/EIP712_VERSION must be AegisEngine/1; the contract domain is immutable.");
@@ -43,7 +43,7 @@ if (!receipt) throw new Error("Deployment receipt was not mined.");
 
 await (await contract.setRelayer(relayer, true)).wait();
 await (await contract.setTarget(aave, true)).wait();
-if (balancer) if (balancer) await (await contract.setTarget(balancer, true)).wait();
+if (balancer) await (await contract.setTarget(balancer, true)).wait();
 
 for (const [targetName, selectorName] of [["UNISWAP_V2_ROUTER","UNISWAP_V2_SELECTOR"],["UNISWAP_V3_ROUTER","UNISWAP_V3_SELECTOR"]] as const) {
   const target = optionalAddress(targetName);
