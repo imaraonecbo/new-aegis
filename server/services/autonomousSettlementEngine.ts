@@ -82,19 +82,10 @@ export class AutonomousSettlementEngine {
 
     // Autonomous background daemon runs every 15 minutes to inspect strategy yield queues and auto-settle
     this.intervalTimer = setInterval(() => {
-      if (this.isDaemonActive) {
-        // Autonomous micro-yield capture simulation
-        const microYield = 150 + Math.floor(Math.random() * 350);
-        try {
-          this.executeSettlement({
-            grossYieldUsd: microYield,
-            sourceStrategy: 'STRAT_ETH_STETH_ARBITRAGE',
-            trigger: 'AUTONOMOUS_BACKGROUND_DAEMON'
-          });
-        } catch (err) {
-          logger.error('Autonomous Settlement Daemon auto-recovery triggered', err);
-        }
-      }
+      if (!this.isDaemonActive) return;
+      // Production rule: settlement is event-driven only.
+      // Never manufacture yield, PnL, transaction hashes, or settlement records.
+      logger.info('Autonomous settlement heartbeat: waiting for verified realized-profit events');
     }, 15 * 60 * 1000);
   }
 
