@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { createSmartWalletClient, alchemyWalletTransport } from "@alchemy/wallet-apis";
 import { privateKeyToAccount } from "viem/accounts";
-import { arbitrum } from "viem/chains";
+import { arbitrum, arbitrumSepolia } from "viem/chains";
 import type { Address, Hex } from "viem";
 import { Contract, JsonRpcProvider } from "ethers";
 import { env } from "../config/env.js";
@@ -31,7 +31,7 @@ let cachedAccount: Address | undefined;
 export async function getGaslessAccount(): Promise<Address> {
   if (cachedAccount) return cachedAccount;
   const signer = privateKeyToAccount(env.AA_OWNER_PRIVATE_KEY as `0x${string}`);
-  const client = createSmartWalletClient({ transport: alchemyWalletTransport({ apiKey: env.ALCHEMY_API_KEY! }), chain: arbitrum, signer });
+  const client = createSmartWalletClient({ transport: alchemyWalletTransport({ apiKey: env.ALCHEMY_API_KEY! }), chain, signer });
   const requested = env.AA_ACCOUNT_ADDRESS
     ? requireAddress(env.AA_ACCOUNT_ADDRESS, "AA_ACCOUNT_ADDRESS")
     : (await client.requestAccount({ creationHint: { accountType: "sma-b", createAdditional: true } })).address as Address;
@@ -56,14 +56,16 @@ export async function executeGaslessCall(input: {
   if (input.netProfitUsd < env.MIN_PROFIT_USD) throw new Error("AA: profitability gate failed");
 
   const executor = requireAddress(env.EXECUTOR_ADDRESS, "EXECUTOR_ADDRESS");
+  const chain = env.CHAIN_ID === 421614 ? arbitrumSepolia : arbitrum;
   const data = hexData(input.data);
   if (input.to.toLowerCase() !== executor.toLowerCase()) throw new Error("AA: execution target must be the configured executor");
 
   const account = await getGaslessAccount();
   if (input.expectedRelayer.toLowerCase() !== account.toLowerCase()) throw new Error(`AA: EIP-712 relayer ${input.expectedRelayer} does not match smart account ${account}`);
 
-  const provider = new JsonRpcProvider(env.ARBITRUM_RPC_URL, 42161, { staticNetwork: true });
-  if ((await provider.getNetwork()).chainId !== 42161n) throw new Error("AA: wrong chain");
+  const rpc = env.CHAIN_ID === 421614 ? (env.ARBITRUM_SEPOLIA_RPC_URL || env.ARBITRUM_RPC_URL) : env.ARBITRUM_RPC_URL;
+  const provider = new JsonRpcProvider(rpc, env.CHAIN_ID, { staticNetwork: true });
+  if ((await provider.getNetwork()).chainId !== BigInt(env.CHAIN_ID)) throw new Error("AA: wrong chain");
 
   const executorContract = new Contract(executor, EXECUTOR_ABI, provider);
   if (await executorContract.paused()) throw new Error("AA: executor is paused");
