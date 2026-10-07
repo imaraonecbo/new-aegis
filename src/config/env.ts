@@ -8,8 +8,8 @@ const schema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("production"),
   ENGINE_ENABLED: b.default("false"),
   ENGINE_DRY_RUN: b.default("true"),
-  CHAIN_ID: z.coerce.number().int().default(42161),
-  ARBITRUM_RPC_URL: z.string().url(),
+  CHAIN_ID: z.coerce.number().int().refine(v => v === 42161 || v === 421614, "Supported chains: Arbitrum One (42161) or Arbitrum Sepolia (421614)").default(421614),
+  ARBITRUM_RPC_URL: z.string().url(),\n  ARBITRUM_SEPOLIA_RPC_URL: z.string().url().optional(),
   ARBITRUM_SIMULATION_RPC_URL: z.string().url(),
   ARBITRUM_PRIVATE_RPC_URL: z.string().url(),
   EXECUTOR_ADDRESS: address,
@@ -46,7 +46,7 @@ const schema = z.object({
   RISK_PANIC_ENABLED: b.default("true"),
   AEGIS_RISK_STATE_FILE: z.string().default("runtime/aegis-risk-state.json")
 }).superRefine((v, c) => {
-  if (v.CHAIN_ID !== 42161) c.addIssue({ code: "custom", path: ["CHAIN_ID"], message: "Arbitrum One only" });
+  if (v.CHAIN_ID === 421614 && !v.ARBITRUM_SEPOLIA_RPC_URL) c.addIssue({ code: "custom", path: ["ARBITRUM_SEPOLIA_RPC_URL"], message: "Arbitrum Sepolia RPC is required on testnet" });
   if (v.ENGINE_ENABLED && v.ENGINE_DRY_RUN) c.addIssue({ code: "custom", path: ["ENGINE_DRY_RUN"], message: "Live engine cannot be dry-run" });
   if (v.ENGINE_ENABLED && !v.SIMULATION_ENDPOINT_ATTESTED) c.addIssue({ code: "custom", path: ["SIMULATION_ENDPOINT_ATTESTED"], message: "Dedicated private simulation endpoint must be attested" });
 
