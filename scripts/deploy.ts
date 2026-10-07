@@ -68,6 +68,5 @@ const record = {
   bytecodeBytes, deployedAt: new Date().toISOString()
 };
 await mkdir(resolve("deployments"), { recursive: true });
-await writeFile(deploymentPath, JSON.stringify(record, null, 2) + "
-", "utf8");
+await writeFile(deploymentPath, JSON.stringify(record, null, 2) + "\n", "utf8");
 console.log(JSON.stringify(record, null, 2));
