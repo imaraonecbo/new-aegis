@@ -11,14 +11,14 @@ const optionalAddress = (name: string): string | undefined => { const value = pr
 const optionalSelector = (name: string): string | undefined => { const value = process.env[name]?.trim(); if (!value) return undefined; if (!/^0x[0-9a-fA-F]{8}$/.test(value)) throw new Error(`Invalid 4-byte selector in ${name}: ${value}`); return value; };
 
 const artifactPath = resolve("artifacts/contracts/AegisFlashLoanExecutor.sol/AegisFlashLoanExecutor.json");
-const deploymentPath = resolve(process.env.DEPLOYMENT_FILE || "deployments/arbitrum-mainnet.json");
+const chainId = Number(process.env.DEPLOY_CHAIN_ID || process.env.CHAIN_ID || 421614);\nconst deploymentPath = resolve(process.env.DEPLOYMENT_FILE || (chainId === 421614 ? "deployments/arbitrum-sepolia.json" : "deployments/arbitrum-mainnet.json"));
 const { ethers } = await network.connect();
 const provider = ethers.provider;
 const [deployer] = await ethers.getSigners();
 if (!deployer) throw new Error("No deployer signer is configured. Set PRIVATE_KEY.");
 
 const networkInfo = await provider.getNetwork();
-if (networkInfo.chainId !== 42161n) throw new Error(`Refusing deployment: expected Arbitrum chain 42161, got ${networkInfo.chainId}`);
+if (networkInfo.chainId !== BigInt(chainId)) throw new Error(`Refusing deployment: expected chain ${chainId}, got ${networkInfo.chainId}`);
 
 const deployerAddress = await deployer.getAddress();
 const balance = await provider.getBalance(deployerAddress);
@@ -33,7 +33,7 @@ const version = process.env.EIP712_VERSION || "1";
 if (name !== "AegisEngine" || version !== "1") throw new Error("EIP712_NAME/EIP712_VERSION must be AegisEngine/1; the contract domain is immutable.");
 
 const factory = await ethers.getContractFactory("AegisFlashLoanExecutor");
-const contract = await factory.deploy(aave, balancer, deployerAddress);
+const contract = await factory.deploy(aave, balancer || ethers.ZeroAddress, deployerAddress);
 const deploymentTx = contract.deploymentTransaction();
 if (!deploymentTx) throw new Error("Deployment transaction was not created.");
 await contract.waitForDeployment();
@@ -43,7 +43,7 @@ if (!receipt) throw new Error("Deployment receipt was not mined.");
 
 await (await contract.setRelayer(relayer, true)).wait();
 await (await contract.setTarget(aave, true)).wait();
-await (await contract.setTarget(balancer, true)).wait();
+if (balancer) await (await contract.setTarget(balancer, true)).wait();
 
 for (const [targetName, selectorName] of [["UNISWAP_V2_ROUTER","UNISWAP_V2_SELECTOR"],["UNISWAP_V3_ROUTER","UNISWAP_V3_SELECTOR"]] as const) {
   const target = optionalAddress(targetName);
@@ -61,10 +61,10 @@ let bytecodeBytes: number | null = null;
 try { const artifact = JSON.parse(await readFile(artifactPath, "utf8")); bytecodeBytes = artifact.deployedBytecode ? (artifact.deployedBytecode.length - 2) / 2 : null; } catch {}
 
 const record = {
-  network: "arbitrum", chainId: 42161, contract: "AegisFlashLoanExecutor", address: executor,
-  deployer: deployerAddress, relayer, constructorArgs: [aave, balancer, deployerAddress],
+  network: chainId === 421614 ? "arbitrum-sepolia" : "arbitrum", chainId, contract: "AegisFlashLoanExecutor", address: executor,
+  deployer: deployerAddress, relayer, constructorArgs: [aave, balancer || ethers.ZeroAddress, deployerAddress],
   deploymentTransaction: deploymentTx.hash, blockNumber: receipt.blockNumber,
-  eip712: { name: "AegisEngine", version: "1", domainSeparator }, endpoints: { aave, balancer },
+  eip712: { name: "AegisEngine", version: "1", domainSeparator }, endpoints: { aave, balancer: balancer || null },
   bytecodeBytes, deployedAt: new Date().toISOString()
 };
 await mkdir(resolve("deployments"), { recursive: true });
