@@ -17,6 +17,7 @@ export type FiveGateOpportunity = {
   signature: string;
   expectedSigner: string;
   risk: ExecutionRiskSnapshot;
+  simulationData?: string;
 };
 
 export async function executeFiveGates(o: FiveGateOpportunity) {
@@ -47,7 +48,7 @@ export async function executeFiveGates(o: FiveGateOpportunity) {
   }
 
   try {
-    await simulatePrivate({ from: o.from, to: o.to, data: o.calldata });
+    await simulatePrivate({ from: o.from, to: o.to, data: o.simulationData ?? o.calldata });
     recordSuccessfulExecution();
   } catch (error) {
     recordSimulationFailure();
