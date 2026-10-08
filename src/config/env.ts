@@ -29,6 +29,8 @@ const schema = z.object({
   AA_ENABLED: b.default("false"),
   ALCHEMY_API_KEY: z.string().min(1).optional(),
   ALCHEMY_POLICY_ID: z.string().min(1).optional(),
+  ALCHEMY_SEPOLIA_POLICY_ID: z.string().min(1).optional(),
+  ALCHEMY_MAINNET_POLICY_ID: z.string().min(1).optional(),
   AA_OWNER_PRIVATE_KEY: hexKey.optional(),
   AA_ACCOUNT_ADDRESS: address.optional(),
   AA_MAX_SPONSORED_GAS_WEI: z.coerce.bigint().positive().default(1000000000000000n),
@@ -52,7 +54,8 @@ const schema = z.object({
 
   if (v.ENGINE_ENABLED && v.AA_ENABLED) {
     if (!v.ALCHEMY_API_KEY) c.addIssue({ code: "custom", path: ["ALCHEMY_API_KEY"], message: "Alchemy API key required for AA" });
-    if (!v.ALCHEMY_POLICY_ID) c.addIssue({ code: "custom", path: ["ALCHEMY_POLICY_ID"], message: "Alchemy paymaster policy required for AA" });
+    const policy = v.CHAIN_ID === 421614 ? (v.ALCHEMY_SEPOLIA_POLICY_ID || v.ALCHEMY_POLICY_ID) : (v.ALCHEMY_MAINNET_POLICY_ID || v.ALCHEMY_POLICY_ID);
+    if (!policy) c.addIssue({ code: "custom", path: ["ALCHEMY_POLICY_ID"], message: "Alchemy BSO policy required for the selected chain" });
     if (!v.AA_OWNER_PRIVATE_KEY) c.addIssue({ code: "custom", path: ["AA_OWNER_PRIVATE_KEY"], message: "AA owner key required for AA" });
     if (!v.AA_MAX_SPONSORED_GAS_WEI) c.addIssue({ code: "custom", path: ["AA_MAX_SPONSORED_GAS_WEI"], message: "Local sponsored gas cap required for AA" });
     if (!v.AA_MAX_FEE_PER_GAS_WEI) c.addIssue({ code: "custom", path: ["AA_MAX_FEE_PER_GAS_WEI"], message: "AA max fee-per-gas cap required for AA" });
