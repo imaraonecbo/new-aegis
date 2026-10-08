@@ -95,12 +95,17 @@ contract AegisFlashLoanExecutor is EIP712,Ownable,ReentrancyGuard,Pausable,IUnis
     event V2PairWhitelistUpdated(address indexed pair,bool enabled);
     event SelectorWhitelistUpdated(address indexed target,bytes4 indexed selector,bool enabled);
     event ExecutionCompleted(uint256 indexed nonce,address indexed asset,uint256 principal,uint256 fee,uint256 relayerFeeCap,uint256 profit,bytes32 routeHash);
+    event TreasuryUpdated(address indexed treasury);
+    event ProfitSwept(address indexed token,address indexed treasury,uint256 amount,uint256 nonce);
     event EmergencyTokenRescue(address indexed token,address indexed to,uint256 amount);
 
+    address public treasury;
+
     constructor(address aave,address balancer,address owner_) EIP712("AegisEngine","1") Ownable(owner_) {
-        if(aave==address(0)||balancer==address(0)||owner_==address(0)) revert ZeroAddress();
+        if(aave==address(0)||owner_==address(0)) revert ZeroAddress();
         AAVE_POOL=IAaveV3Pool(aave);
         BALANCER_VAULT=IBalancerVault(balancer);
+        treasury=owner_;
         authorizedRelayers[owner_]=true;
         authorizedSigners[owner_]=true;
     }
@@ -117,6 +122,17 @@ contract AegisFlashLoanExecutor is EIP712,Ownable,ReentrancyGuard,Pausable,IUnis
     function setSelector(address a,bytes4 s,bool v) external onlyOwner { if(a==address(0)) revert ZeroAddress(); selectorWhitelist[a][s]=v; emit SelectorWhitelistUpdated(a,s,v); }
     function pause() external onlyOwner {_pause();}
     function unpause() external onlyOwner {_unpause();}
+    function setTreasury(address a) external onlyOwner {
+        if(a==address(0)) revert ZeroAddress();
+        treasury=a;
+        emit TreasuryUpdated(a);
+    }
+
+    function _sweepProfit(address token,uint256 amount,uint256 nonce) internal {
+        if(amount==0) return;
+        IERC20(token).safeTransfer(treasury,amount);
+        emit ProfitSwept(token,treasury,amount,nonce);
+    }
 
     function executeFlashLoan(Execution calldata e,Call[] calldata c,Approval[] calldata a,bytes calldata sig)
         external nonReentrant whenNotPaused onlyRelayer
@@ -136,6 +152,7 @@ contract AegisFlashLoanExecutor is EIP712,Ownable,ReentrancyGuard,Pausable,IUnis
         Approval[] calldata a,
         bytes calldata sig
     ) external nonReentrant whenNotPaused onlyRelayer {
+        if(address(BALANCER_VAULT)==address(0)) revert InvalidCaller();
         if(tokens.length==0||tokens.length!=amounts.length||e.amount==0) revert InvalidArrayLength();
         _validate(e,c,a,sig,msg.sender);
         uint256[] memory baselines=new uint256[](tokens.length);
@@ -242,7 +259,7 @@ contract AegisFlashLoanExecutor is EIP712,Ownable,ReentrancyGuard,Pausable,IUnis
         external onlyActive
     {
         if(msg.sig!=BALANCER_CALLBACK_SELECTOR) revert InvalidCaller();
-        if(activeSource!=SOURCE_BALANCER||msg.sender!=address(BALANCER_VAULT)||tokens.length==0||tokens.length!=amounts.length||tokens.length!=feeAmounts.length) revert InvalidCaller();
+        if(address(BALANCER_VAULT)==address(0)||activeSource!=SOURCE_BALANCER||msg.sender!=address(BALANCER_VAULT)||tokens.length==0||tokens.length!=amounts.length||tokens.length!=feeAmounts.length) revert InvalidCaller();
         (Execution memory e,address[] memory dataTokens,uint256[] memory dataAmounts,uint256[] memory baselines,Call[] memory c,Approval[] memory ap,bytes memory sig)=abi.decode(p,(Execution,address[],uint256[],uint256[],Call[],Approval[],bytes));
         if(dataTokens.length!=tokens.length||dataAmounts.length!=tokens.length||baselines.length!=tokens.length) revert InvalidArrayLength();
         if(keccak256(abi.encode(tokens,amounts))!=activeLoanHash) revert InvalidRoute();
@@ -261,7 +278,9 @@ contract AegisFlashLoanExecutor is EIP712,Ownable,ReentrancyGuard,Pausable,IUnis
         uint256 requiredPost=0;
         for(uint256 i=0;i<tokens.length;i++) if(tokens[i]==e.asset){requiredPost=baselines[i]+e.minProfit;break;}
         if(post<requiredPost) revert InsufficientProfit(post,requiredPost);
-        emit ExecutionCompleted(e.nonce,e.asset,e.amount,feeAmounts[0],e.relayerFeeCap,post-activeBaseline-e.amount-feeAmounts[0],e.routeHash);
+        uint256 profitAfterFee=post-activeBaseline;
+        _sweepProfit(e.asset,profitAfterFee,e.nonce);
+        emit ExecutionCompleted(e.nonce,e.asset,e.amount,feeAmounts[0],e.relayerFeeCap,profitAfterFee,e.routeHash);
     }
 
     function uniswapV2Call(address sender,uint256 amount0,uint256 amount1,bytes calldata data) external override onlyActive {
@@ -283,7 +302,9 @@ contract AegisFlashLoanExecutor is EIP712,Ownable,ReentrancyGuard,Pausable,IUnis
         uint256 post=IERC20(e.asset).balanceOf(address(this));
         uint256 requiredPost=activeBaseline+e.minProfit;
         if(post<requiredPost) revert InsufficientProfit(post,requiredPost);
-        emit ExecutionCompleted(e.nonce,e.asset,borrowed,fee,e.relayerFeeCap,post-activeBaseline,e.routeHash);
+        uint256 profitAfterFee=post-activeBaseline;
+        _sweepProfit(e.asset,profitAfterFee,e.nonce);
+        emit ExecutionCompleted(e.nonce,e.asset,borrowed,fee,e.relayerFeeCap,profitAfterFee,e.routeHash);
     }
 
     function uniswapV3FlashCallback(uint256 fee0,uint256 fee1,bytes calldata data) external override onlyActive {
@@ -309,7 +330,9 @@ contract AegisFlashLoanExecutor is EIP712,Ownable,ReentrancyGuard,Pausable,IUnis
         uint256 post=IERC20(e.asset).balanceOf(address(this));
         uint256 requiredPost=activeBaseline+e.minProfit;
         if(post<requiredPost) revert InsufficientProfit(post,requiredPost);
-        emit ExecutionCompleted(e.nonce,e.asset,e.amount,fee,e.relayerFeeCap,post-activeBaseline,e.routeHash);
+        uint256 profitAfterFee=post-activeBaseline;
+        _sweepProfit(e.asset,profitAfterFee,e.nonce);
+        emit ExecutionCompleted(e.nonce,e.asset,e.amount,fee,e.relayerFeeCap,profitAfterFee,e.routeHash);
     }
 
     function _settleSingle(Execution memory e,address token,uint256 amount,uint256 premium,address lender) internal {
@@ -321,7 +344,9 @@ contract AegisFlashLoanExecutor is EIP712,Ownable,ReentrancyGuard,Pausable,IUnis
         uint256 post=IERC20(token).balanceOf(address(this));
         uint256 requiredPost=activeBaseline+amount+premium+e.minProfit;
         if(post<requiredPost) revert InsufficientProfit(post,requiredPost);
-        emit ExecutionCompleted(e.nonce,token,amount,premium,e.relayerFeeCap,post-activeBaseline-amount-premium,e.routeHash);
+        uint256 profitAfterFee=post-activeBaseline-amount-premium;
+        _sweepProfit(token,profitAfterFee,e.nonce);
+        emit ExecutionCompleted(e.nonce,token,amount,premium,e.relayerFeeCap,profitAfterFee,e.routeHash);
     }
 
     function _run(Approval[] memory ap,Call[] memory c) internal {

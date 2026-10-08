@@ -16,6 +16,7 @@ function getAccounts() {
 }
 
 const rpc = process.env.ARBITRUM_MAINNET_RPC?.trim();
+const sepoliaRpc = process.env.ARBITRUM_SEPOLIA_RPC?.trim() || "https://sepolia-rollup.arbitrum.io/rpc";
 const forkRpc = rpc || "https://arb1.arbitrum.io/rpc";
 
 const solidityConfig = {
@@ -50,10 +51,10 @@ export default defineConfig({
       forking: { url: forkRpc },
     },
     arbitrum: {
-      type: "http",
-      chainId: 42161,
-      url: forkRpc,
-      accounts: getAccounts(),
+      type: "http", chainId: 42161, url: forkRpc, accounts: getAccounts(),
+    },
+    arbitrumSepolia: {
+      type: "http", chainId: 421614, url: sepoliaRpc, accounts: getAccounts(),
     },
   },
   verify: {

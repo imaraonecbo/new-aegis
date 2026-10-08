@@ -1,0 +1,91 @@
+import "dotenv/config";
+import { createSmartWalletClient, alchemyWalletTransport } from "@alchemy/wallet-apis";
+import { privateKeyToAccount } from "viem/accounts";
+import { arbitrum, arbitrumSepolia } from "viem/chains";
+import { Contract, JsonRpcProvider, Wallet } from "ethers";
+import { readFile, writeFile } from "node:fs/promises";
+
+const required = (name: string) => {
+  const value = process.env[name]?.trim();
+  if (!value) throw new Error(`Missing ${name} in .env`);
+  return value;
+};
+
+const key = required("AA_OWNER_PRIVATE_KEY");
+const apiKey = required("ALCHEMY_API_KEY");
+const executor = required("EXECUTOR_ADDRESS");
+const chainId = Number(process.env.CHAIN_ID || 421614);
+if (chainId !== 42161 && chainId !== 421614) throw new Error(`Unsupported CHAIN_ID: ${chainId}`);
+const deployRpc = required(chainId === 421614 ? "ARBITRUM_SEPOLIA_RPC_URL" : "ARBITRUM_DEPLOY_RPC");
+const chain = chainId === 421614 ? arbitrumSepolia : arbitrum;
+const policyId = chainId === 421614
+  ? (process.env.ALCHEMY_SEPOLIA_POLICY_ID || process.env.ALCHEMY_POLICY_ID)
+  : (process.env.ALCHEMY_MAINNET_POLICY_ID || process.env.ALCHEMY_POLICY_ID);
+if (!policyId) throw new Error("Missing Alchemy BSO policy ID for selected chain");
+const autoAuthorize = process.env.AA_AUTO_AUTHORIZE === "true";
+const persist = process.env.AA_PERSIST_ENV !== "false";
+
+if (!/^0x[0-9a-fA-F]{64}$/.test(key)) throw new Error("AA_OWNER_PRIVATE_KEY must be a 32-byte hex key");
+if (!/^0x[0-9a-fA-F]{40}$/.test(executor)) throw new Error("EXECUTOR_ADDRESS is invalid");
+
+const signer = privateKeyToAccount(key as `0x${string}`);
+const client = createSmartWalletClient({
+  transport: alchemyWalletTransport({ apiKey }),
+  chain,
+  paymaster: { policyId },
+  signer
+});
+
+const { address: aaAddress } = await client.requestAccount({
+  creationHint: { accountType: "sma-b", createAdditional: true }
+});
+
+const provider = new JsonRpcProvider(deployRpc, chainId, { staticNetwork: true });
+const net = await provider.getNetwork();
+if (net.chainId !== BigInt(chainId)) throw new Error(`Wrong deployment chain: ${net.chainId}`);
+
+const abi = [
+  "function owner() view returns(address)",
+  "function authorizedRelayers(address) view returns(bool)",
+  "function setRelayer(address,bool)"
+] as const;
+
+const executorContract = new Contract(executor, abi, provider);
+const owner = (await executorContract.owner()).toLowerCase();
+const deployer = new Wallet(key, provider);
+
+if (deployer.address.toLowerCase() !== owner) {
+  throw new Error(`AA owner key ${deployer.address} does not own executor ${executor}`);
+}
+
+let authorized = await executorContract.authorizedRelayers(aaAddress);
+let txHash: string | null = null;
+
+if (!authorized && autoAuthorize) {
+  const tx = await (executorContract.connect(deployer) as any).setRelayer(aaAddress, true);
+  txHash = tx.hash;
+  await tx.wait(5);
+  authorized = await executorContract.authorizedRelayers(aaAddress);
+}
+
+if (!authorized) {
+  throw new Error("AA smart account is not authorized. Set AA_AUTO_AUTHORIZE=true for one-time owner authorization.");
+}
+
+if (persist) {
+  const path = ".env";
+  const current = await readFile(path, "utf8");
+  const line = `AA_ACCOUNT_ADDRESS=${aaAddress}`;
+  const re = /^AA_ACCOUNT_ADDRESS=.*$/m;
+  const updated = re.test(current) ? current.replace(re, line) : current.trimEnd() + `\n${line}\n`;
+  await writeFile(path, updated, "utf8");
+}
+
+console.log(JSON.stringify({
+  chainId,
+  executor,
+  owner: deployer.address,
+  aaAccount: aaAddress,
+  authorizedRelayer: authorized,
+  ownerAuthorizationTx: txHash
+}, null, 2));
