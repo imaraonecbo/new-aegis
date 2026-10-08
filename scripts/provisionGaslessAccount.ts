@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { createSmartWalletClient, alchemyWalletTransport } from "@alchemy/wallet-apis";
 import { privateKeyToAccount } from "viem/accounts";
-import { arbitrum } from "viem/chains";
+import { arbitrum, arbitrumSepolia } from "viem/chains";
 import { Contract, JsonRpcProvider, Wallet } from "ethers";
 import { readFile, writeFile } from "node:fs/promises";
 
@@ -14,7 +14,7 @@ const required = (name: string) => {
 const key = required("AA_OWNER_PRIVATE_KEY");
 const apiKey = required("ALCHEMY_API_KEY");
 const executor = required("EXECUTOR_ADDRESS");
-const deployRpc = required("ARBITRUM_DEPLOY_RPC");
+const chainId = Number(process.env.CHAIN_ID || 42161);\nconst deployRpc = required(chainId === 421614 ? "ARBITRUM_SEPOLIA_RPC_URL" : "ARBITRUM_DEPLOY_RPC");\nconst chain = chainId === 421614 ? arbitrumSepolia : arbitrum;
 const autoAuthorize = process.env.AA_AUTO_AUTHORIZE === "true";
 const persist = process.env.AA_PERSIST_ENV !== "false";
 
@@ -24,7 +24,7 @@ if (!/^0x[0-9a-fA-F]{40}$/.test(executor)) throw new Error("EXECUTOR_ADDRESS is 
 const signer = privateKeyToAccount(key as `0x${string}`);
 const client = createSmartWalletClient({
   transport: alchemyWalletTransport({ apiKey }),
-  chain: arbitrum,
+  chain,\n  paymaster: { policyId: required("ALCHEMY_POLICY_ID") },
   signer
 });
 
@@ -74,7 +74,7 @@ if (persist) {
 }
 
 console.log(JSON.stringify({
-  chainId: 42161,
+  chainId,
   executor,
   owner: deployer.address,
   aaAccount: aaAddress,
