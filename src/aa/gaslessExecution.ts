@@ -27,11 +27,12 @@ function hexData(value: string): Hex {
   return value as Hex;
 }
 let cachedAccount: Address | undefined;
+const aaChain = env.CHAIN_ID === 421614 ? arbitrumSepolia : arbitrum;
 
 export async function getGaslessAccount(): Promise<Address> {
   if (cachedAccount) return cachedAccount;
   const signer = privateKeyToAccount(env.AA_OWNER_PRIVATE_KEY as `0x${string}`);
-  const client = createSmartWalletClient({ transport: alchemyWalletTransport({ apiKey: env.ALCHEMY_API_KEY! }), chain, signer });
+  const client = createSmartWalletClient({ transport: alchemyWalletTransport({ apiKey: env.ALCHEMY_API_KEY! }), chain: aaChain, signer, paymaster: { policyId: env.ALCHEMY_POLICY_ID! } });
   const requested = env.AA_ACCOUNT_ADDRESS
     ? requireAddress(env.AA_ACCOUNT_ADDRESS, "AA_ACCOUNT_ADDRESS")
     : (await client.requestAccount({ creationHint: { accountType: "sma-b", createAdditional: true } })).address as Address;
@@ -68,7 +69,7 @@ export async function executeGaslessCall(input: {
   if (input.netProfitUsd < env.MIN_PROFIT_USD) throw new Error("AA: profitability gate failed");
 
   const executor = requireAddress(env.EXECUTOR_ADDRESS, "EXECUTOR_ADDRESS");
-  const chain = env.CHAIN_ID === 421614 ? arbitrumSepolia : arbitrum;
+  const chain = aaChain;
   const data = hexData(input.data);
   if (input.to.toLowerCase() !== executor.toLowerCase()) throw new Error("AA: execution target must be the configured executor");
 
