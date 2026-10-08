@@ -14,7 +14,14 @@ const required = (name: string) => {
 const key = required("AA_OWNER_PRIVATE_KEY");
 const apiKey = required("ALCHEMY_API_KEY");
 const executor = required("EXECUTOR_ADDRESS");
-const chainId = Number(process.env.CHAIN_ID || 42161);\nconst deployRpc = required(chainId === 421614 ? "ARBITRUM_SEPOLIA_RPC_URL" : "ARBITRUM_DEPLOY_RPC");\nconst chain = chainId === 421614 ? arbitrumSepolia : arbitrum;
+const chainId = Number(process.env.CHAIN_ID || 421614);
+if (chainId !== 42161 && chainId !== 421614) throw new Error(`Unsupported CHAIN_ID: ${chainId}`);
+const deployRpc = required(chainId === 421614 ? "ARBITRUM_SEPOLIA_RPC_URL" : "ARBITRUM_DEPLOY_RPC");
+const chain = chainId === 421614 ? arbitrumSepolia : arbitrum;
+const policyId = chainId === 421614
+  ? (process.env.ALCHEMY_SEPOLIA_POLICY_ID || process.env.ALCHEMY_POLICY_ID)
+  : (process.env.ALCHEMY_MAINNET_POLICY_ID || process.env.ALCHEMY_POLICY_ID);
+if (!policyId) throw new Error("Missing Alchemy BSO policy ID for selected chain");
 const autoAuthorize = process.env.AA_AUTO_AUTHORIZE === "true";
 const persist = process.env.AA_PERSIST_ENV !== "false";
 
@@ -24,7 +31,8 @@ if (!/^0x[0-9a-fA-F]{40}$/.test(executor)) throw new Error("EXECUTOR_ADDRESS is 
 const signer = privateKeyToAccount(key as `0x${string}`);
 const client = createSmartWalletClient({
   transport: alchemyWalletTransport({ apiKey }),
-  chain,\n  paymaster: { policyId: required("ALCHEMY_POLICY_ID") },
+  chain,
+  paymaster: { policyId },
   signer
 });
 
@@ -32,9 +40,9 @@ const { address: aaAddress } = await client.requestAccount({
   creationHint: { accountType: "sma-b", createAdditional: true }
 });
 
-const provider = new JsonRpcProvider(deployRpc, 42161, { staticNetwork: true });
+const provider = new JsonRpcProvider(deployRpc, chainId, { staticNetwork: true });
 const net = await provider.getNetwork();
-if (net.chainId !== 42161n) throw new Error(`Wrong deployment chain: ${net.chainId}`);
+if (net.chainId !== BigInt(chainId)) throw new Error(`Wrong deployment chain: ${net.chainId}`);
 
 const abi = [
   "function owner() view returns(address)",
