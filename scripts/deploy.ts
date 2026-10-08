@@ -21,12 +21,12 @@ if (!deployer) throw new Error("No deployer signer is configured. Set PRIVATE_KE
 const networkInfo = await provider.getNetwork();
 if (networkInfo.chainId !== BigInt(chainId)) throw new Error(`Refusing deployment: expected chain ${chainId}, got ${networkInfo.chainId}`);
 
+const deployerAddress = await deployer.getAddress();
 const balance = await provider.getBalance(deployerAddress);
 if (balance === 0n && process.env.REQUIRE_DEPLOYER_FUNDS === "true") throw new Error("Deployer has zero native balance and REQUIRE_DEPLOYER_FUNDS=true.");
 
 const aave = address("AAVE_V3_POOL");
 const balancer = optionalAddress("BALANCER_VAULT");
-const deployerAddress = await deployer.getAddress();
 const relayer = optionalAddress("RELAYER_ADDRESS") || deployerAddress;
 const name = process.env.EIP712_NAME || "AegisEngine";
 const version = process.env.EIP712_VERSION || "1";
