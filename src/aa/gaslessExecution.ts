@@ -42,11 +42,23 @@ export async function getGaslessAccount(): Promise<Address> {
 export type GaslessExecutionResult = {
   callId: string;
   account: string;
-  maxGasToken: bigint;
+  maxSponsoredGasWei: bigint;
   status: "success";
   transactionHash?: string;
   receipts: unknown[];
 };
+
+function estimatePreparedGasWei(prepared: any): bigint {
+  const candidate = Array.isArray(prepared?.data)
+    ? prepared.data.find((x: any) => x?.type === "user-operation-v070" || x?.type === "user-operation-v060")
+    : prepared;
+  const d = candidate?.data ?? candidate;
+  const gasFields = ["callGasLimit", "verificationGasLimit", "preVerificationGas", "paymasterVerificationGasLimit", "paymasterPostOpGasLimit"];
+  const gas = gasFields.reduce((sum, k) => sum + (d?.[k] !== undefined ? BigInt(d[k]) : 0n), 0n);
+  const fee = d?.maxFeePerGas !== undefined ? BigInt(d.maxFeePerGas) : 0n;
+  if (gas === 0n || fee === 0n) throw new Error("AA: sponsored UserOperation did not expose usable gas/fee fields");
+  return gas * fee;
+}
 
 export async function executeGaslessCall(input: {
   to: string; data: string; netProfitUsd: number; expectedRelayer: string;
@@ -74,39 +86,24 @@ export async function executeGaslessCall(input: {
   await simulatePrivate({ from: account, to: executor, data });
   if (await panicActive()) throw new Error("AA: panic switch activated during preparation");
 
+  const signer = privateKeyToAccount(env.AA_OWNER_PRIVATE_KEY as `0x${string}`);
   const client = createSmartWalletClient({
     transport: alchemyWalletTransport({ apiKey: env.ALCHEMY_API_KEY! }),
-    chain: arbitrum,
-    signer: privateKeyToAccount(env.AA_OWNER_PRIVATE_KEY as `0x${string}`)
+    chain,
+    signer,
+    paymaster: { policyId: env.ALCHEMY_POLICY_ID! }
   });
 
   const prepared: any = await client.prepareCalls({
     account,
-    calls: [{ to: executor, value: 0n, data }],
-    capabilities: { paymaster: {
-      policyId: env.ALCHEMY_POLICY_ID!,
-      erc20: {
-        tokenAddress: requireAddress(env.AA_GAS_TOKEN_ADDRESS!, "AA_GAS_TOKEN_ADDRESS"),
-        maxTokenAmount: env.AA_MAX_GAS_TOKEN_AMOUNT!,
-        postOpSettings: { autoApprove: true }
-      }
-    }}
+    calls: [{ to: executor, value: 0n, data }]
   });
 
   if (prepared.type === "paymaster-permit") throw new Error("AA: interactive paymaster permit requested; refusing headless execution");
-  const feePayment = prepared.feePayment ?? (Array.isArray(prepared.data) ? prepared.data.find((x: any) => x?.feePayment)?.feePayment : undefined);
-  if (!feePayment) throw new Error("AA: paymaster returned no ERC-20 fee quote");
-  if (feePayment.sponsored === true) throw new Error("AA: policy returned native-gas sponsorship instead of ERC-20 settlement");
 
-  const tokenAddress = requireAddress(env.AA_GAS_TOKEN_ADDRESS!, "AA_GAS_TOKEN_ADDRESS");
-  if (String(feePayment.tokenAddress).toLowerCase() !== tokenAddress.toLowerCase()) throw new Error("AA: paymaster returned an unexpected gas token");
-  const maxGasToken = BigInt(feePayment.maxAmount);
-  if (maxGasToken > env.AA_MAX_GAS_TOKEN_AMOUNT!) throw new Error(`AA: gas-token quote exceeds cap: ${maxGasToken} > ${env.AA_MAX_GAS_TOKEN_AMOUNT}`);
-
-  const preparedData = Array.isArray(prepared.data) ? prepared.data.find((x: any) => x?.type === "user-operation-v070" || x?.type === "user-operation-v060") : prepared;
-  const maxFeePerGas = preparedData?.data?.maxFeePerGas;
-  if (maxFeePerGas !== undefined && env.AA_MAX_FEE_PER_GAS_WEI && BigInt(maxFeePerGas) > env.AA_MAX_FEE_PER_GAS_WEI) {
-    throw new Error(`AA: maxFeePerGas exceeds cap: ${maxFeePerGas} > ${env.AA_MAX_FEE_PER_GAS_WEI}`);
+  const estimatedSponsoredGasWei = estimatePreparedGasWei(prepared);
+  if (estimatedSponsoredGasWei > env.AA_MAX_SPONSORED_GAS_WEI) {
+    throw new Error(`AA: sponsored gas estimate exceeds local cap: ${estimatedSponsoredGasWei} > ${env.AA_MAX_SPONSORED_GAS_WEI}`);
   }
 
   if (await panicActive()) throw new Error("AA: panic switch activated before signing");
@@ -123,6 +120,15 @@ export async function executeGaslessCall(input: {
   const receipts = Array.isArray(status?.receipts) ? status.receipts : [];
   const transactionHash = status?.transactionHash ?? status?.receipts?.[0]?.transactionHash ?? status?.receipts?.[0]?.receipt?.transactionHash;
 
-  console.log(JSON.stringify({ mode: "ERC-4337-AA", account, executor, callId, status: status.status, transactionHash, gasToken: feePayment.tokenAddress, maxGasToken: maxGasToken.toString() }));
-  return { callId, account, maxGasToken, status: "success", transactionHash, receipts };
+  console.log(JSON.stringify({
+    mode: "ERC-4337-BSO",
+    chainId: env.CHAIN_ID,
+    account,
+    executor,
+    callId,
+    status: status.status,
+    transactionHash,
+    estimatedSponsoredGasWei: estimatedSponsoredGasWei.toString()
+  }));
+  return { callId, account, maxSponsoredGasWei: estimatedSponsoredGasWei, status: "success", transactionHash, receipts };
 }
