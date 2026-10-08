@@ -93,7 +93,7 @@ export async function executeGaslessCall(input: {
     transport: alchemyWalletTransport({ apiKey: env.ALCHEMY_API_KEY! }),
     chain,
     signer,
-    paymaster: { policyId: env.ALCHEMY_POLICY_ID! }
+    paymaster: { policyId: aaPolicyId! }
   });
 
   const prepared: any = await client.prepareCalls({
