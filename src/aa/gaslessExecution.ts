@@ -28,11 +28,12 @@ function hexData(value: string): Hex {
 }
 let cachedAccount: Address | undefined;
 const aaChain = env.CHAIN_ID === 421614 ? arbitrumSepolia : arbitrum;
+const aaPolicyId = env.CHAIN_ID === 421614 ? (env.ALCHEMY_SEPOLIA_POLICY_ID || env.ALCHEMY_POLICY_ID) : (env.ALCHEMY_MAINNET_POLICY_ID || env.ALCHEMY_POLICY_ID);
 
 export async function getGaslessAccount(): Promise<Address> {
   if (cachedAccount) return cachedAccount;
   const signer = privateKeyToAccount(env.AA_OWNER_PRIVATE_KEY as `0x${string}`);
-  const client = createSmartWalletClient({ transport: alchemyWalletTransport({ apiKey: env.ALCHEMY_API_KEY! }), chain: aaChain, signer, paymaster: { policyId: env.ALCHEMY_POLICY_ID! } });
+  const client = createSmartWalletClient({ transport: alchemyWalletTransport({ apiKey: env.ALCHEMY_API_KEY! }), chain: aaChain, signer, paymaster: { policyId: aaPolicyId! } });
   const requested = env.AA_ACCOUNT_ADDRESS
     ? requireAddress(env.AA_ACCOUNT_ADDRESS, "AA_ACCOUNT_ADDRESS")
     : (await client.requestAccount({ creationHint: { accountType: "sma-b", createAdditional: true } })).address as Address;
