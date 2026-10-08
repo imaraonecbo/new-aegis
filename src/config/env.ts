@@ -31,8 +31,7 @@ const schema = z.object({
   ALCHEMY_POLICY_ID: z.string().min(1).optional(),
   AA_OWNER_PRIVATE_KEY: hexKey.optional(),
   AA_ACCOUNT_ADDRESS: address.optional(),
-  AA_GAS_TOKEN_ADDRESS: address.optional(),
-  AA_MAX_GAS_TOKEN_AMOUNT: z.coerce.bigint().positive().optional(),
+  AA_MAX_SPONSORED_GAS_WEI: z.coerce.bigint().positive().default(1000000000000000n),
   AA_MAX_FEE_PER_GAS_WEI: z.coerce.bigint().positive().optional(),
   AEGIS_PANIC_FILE: z.string().default("runtime/aegis.panic"),
   SENTRY_DSN: z.string().url().optional(),
@@ -55,8 +54,7 @@ const schema = z.object({
     if (!v.ALCHEMY_API_KEY) c.addIssue({ code: "custom", path: ["ALCHEMY_API_KEY"], message: "Alchemy API key required for AA" });
     if (!v.ALCHEMY_POLICY_ID) c.addIssue({ code: "custom", path: ["ALCHEMY_POLICY_ID"], message: "Alchemy paymaster policy required for AA" });
     if (!v.AA_OWNER_PRIVATE_KEY) c.addIssue({ code: "custom", path: ["AA_OWNER_PRIVATE_KEY"], message: "AA owner key required for AA" });
-    if (!v.AA_GAS_TOKEN_ADDRESS) c.addIssue({ code: "custom", path: ["AA_GAS_TOKEN_ADDRESS"], message: "AA gas token required for AA" });
-    if (!v.AA_MAX_GAS_TOKEN_AMOUNT) c.addIssue({ code: "custom", path: ["AA_MAX_GAS_TOKEN_AMOUNT"], message: "AA gas token cap required for AA" });
+    if (!v.AA_MAX_SPONSORED_GAS_WEI) c.addIssue({ code: "custom", path: ["AA_MAX_SPONSORED_GAS_WEI"], message: "Local sponsored gas cap required for AA" });
     if (!v.AA_MAX_FEE_PER_GAS_WEI) c.addIssue({ code: "custom", path: ["AA_MAX_FEE_PER_GAS_WEI"], message: "AA max fee-per-gas cap required for AA" });
   } else if (v.ENGINE_ENABLED) {
     if (!v.EXECUTOR_PRIVATE_KEY) c.addIssue({ code: "custom", path: ["EXECUTOR_PRIVATE_KEY"], message: "Executor private key required when AA is disabled" });
